@@ -1,0 +1,57 @@
+[project]
+name = "bbrl_algos"
+dynamic = ["version"]
+authors = [
+    { name = "Olivier Sigaud", email = "olivier.sigaud@isir.upmc.fr" },
+    { name = "Mathis Koroglu", email = "mathis.koroglu@etu.sorbonne-universite.fr" }]
+maintainers = [{ name = "Olivier Sigaud", email = "olivier.sigaud@isir.upmc.fr" }]
+
+description = "BBRL algos, a library of reinforcement learning algorithms"
+keywords = ["reinforcement learning"]
+
+readme = "README.md"
+license = { file = "LICENSE" }
+
+requires-python = ">=3.8"
+classifiers = ["Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Natural Language :: English",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = [
+    "bbrl",
+    "wandb",
+    "optuna",
+    "hydra-core"]
+
+[project.optional-dependencies]
+all = [
+    "bbrl",
+    "wandb",
+    "optuna",
+    "hydra-core"]
+
+
+[project.urls]
+repository = "https://github.com/Arlaz/bbrl_algos"
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/bbrl_algos/_version.py"
+
+[tool.black]
+# Black configuration
+line-length = 88
+target-version = ['py38', 'py39', 'py310']
