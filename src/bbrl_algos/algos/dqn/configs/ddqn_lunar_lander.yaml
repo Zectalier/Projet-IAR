@@ -1,4 +1,4 @@
-# Caution: use only the 'suggest_type' in case of using optuna
+﻿# Caution: use only the 'suggest_type' in case of using optuna
 save_best: False
 plot_agents: False
 collect_stats: True
@@ -52,7 +52,7 @@ algorithm:
   optim_n_updates: 3
   discount_factor: 0.99
 
-  n_steps: 3_000
+  n_steps: 5_000
   eval_interval: 1000
   n_updates: 32
 

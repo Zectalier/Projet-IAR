@@ -51,7 +51,7 @@ from bbrl.agents.gymnasium import make_env, ParallelGymAgent
 from functools import partial
 
 
-matplotlib.use("TkAgg")
+matplotlib.use("Agg")
 
 
 def local_get_env_agents(cfg):
@@ -94,12 +94,16 @@ def compute_critic_loss(
     Returns:
         torch.Scalar: The loss
     """
-    if q_target is None:
-        q_target = q_values
-    max_q = q_target[1].amax(dim=-1).detach()
+    
+    best_action = q_values[1].argmax(dim=-1).detach()
+
+    max_q = q_target[1].gather(-1, best_action.unsqueeze(-1)).squeeze().detach()
+
     target = reward[1] + discount_factor * max_q * must_bootstrap[1]
+
     act = action[0].unsqueeze(dim=-1)
     qvals = q_values[0].gather(dim=1, index=act).squeeze(dim=1)
+
     return nn.MSELoss()(qvals, target)
 
 
@@ -120,6 +124,7 @@ def create_dqn_agent(cfg_algo, train_env_agent, eval_env_agent):
         action_dim=action_dim,
         seed=cfg_algo.seed.q,
     )
+    target_critic = copy.deepcopy(critic)
 
     explorer = EGreedyActionSelector(
         name="action_selector",
@@ -129,6 +134,7 @@ def create_dqn_agent(cfg_algo, train_env_agent, eval_env_agent):
         seed=cfg_algo.seed.explorer,
     )
     q_agent = TemporalAgent(critic)
+    target_q_agent = TemporalAgent(critic)
 
     tr_agent = Agents(train_env_agent, critic, explorer)  # , PrintAgent())
     ev_agent = Agents(eval_env_agent, critic)
@@ -136,8 +142,9 @@ def create_dqn_agent(cfg_algo, train_env_agent, eval_env_agent):
     # Get an agent that is executed on a complete workspace
     train_agent = TemporalAgent(tr_agent)
     eval_agent = TemporalAgent(ev_agent)
+    
 
-    return train_agent, eval_agent, q_agent
+    return train_agent, eval_agent, q_agent, target_q_agent
 
 
 # %%
@@ -168,7 +175,7 @@ def run_dqn(cfg, logger, trial=None):
     print(eval_env_agent.envs[0])
 
     # 2) Create the DQN-like Agent
-    train_agent, eval_agent, q_agent = create_dqn_agent(
+    train_agent, eval_agent, q_agent, target_q_agent = create_dqn_agent(
         cfg.algorithm, train_env_agent, eval_env_agent
     )
 
@@ -228,6 +235,10 @@ def run_dqn(cfg, logger, trial=None):
             "action",
         ]
 
+        with torch.no_grad():
+                    target_q_agent(transition_workspace, t=0, n_steps=2, stochastic=True)
+        target_q_values = transition_workspace["critic/q_values"]
+
         # Determines whether values of the critic should be propagated
         # True if the task was not terminated.
         must_bootstrap = ~terminated
@@ -238,6 +249,7 @@ def run_dqn(cfg, logger, trial=None):
             must_bootstrap,
             action,
             q_values,
+            target_q_values
         )
 
         # Store the loss
@@ -327,7 +339,7 @@ def run_dqn(cfg, logger, trial=None):
 @hydra.main(
     config_path="configs/",
     # config_name="dqn_cartpole.yaml",
-    config_name="dqn_lunar_lander.yaml",
+    config_name="ddqn_lunar_lander.yaml",
 )  # , version_base="1.3")
 def main(cfg_raw: DictConfig):
     torch.random.manual_seed(seed=cfg_raw.algorithm.seed.torch)
