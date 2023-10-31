@@ -1,0 +1,63 @@
+﻿# Caution: use only the 'suggest_type' in case of using optuna
+save_best: False
+plot_agents: False
+collect_stats: True
+
+log_dir: ./tmp
+video_dir: ${log_dir}/videos
+
+hydra:
+  run:
+    dir: ${log_dir}/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+logger:
+  classname: bbrl.utils.logger.TFLogger
+  log_dir: ${log_dir}
+  cache_size: 10000
+  every_n_seconds: 10
+  verbose: False
+
+gym_env:
+  env_name: LunarLander-v2
+  render_mode: rgb_array
+
+algorithm:
+  architecture:
+    hidden_sizes: [256, 256]
+
+  seed:
+    train: 455354
+    eval: 34533453
+    q: 44534555233
+    explorer: 1535
+    torch: 4353312345
+
+  explorer:
+    epsilon_start: 0.7
+    epsilon_end: 0.05
+    decay: 0.996
+
+  buffer:
+    max_size: 20_000
+    buffer_size: 1e6
+    batch_size: 256
+    learning_starts: 2000
+
+  target_critic_update_interval: 50
+  max_grad_norm: 1.5
+
+  nb_evals: 10
+  n_envs: 5
+  n_steps_train: 50
+
+  optim_n_updates: 3
+  discount_factor: 0.99
+
+  n_steps: 2_000_000
+  eval_interval: 1000
+  n_updates: 32
+
+
+optimizer:
+  classname: torch.optim.Adam
+  lr: 0.001

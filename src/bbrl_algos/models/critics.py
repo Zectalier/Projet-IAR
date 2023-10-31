@@ -5,7 +5,6 @@ import torch.nn as nn
 from bbrl_algos.models.shared_models import build_mlp, build_alt_mlp
 from bbrl.agents import TimeAgent, SeedableAgent, SerializableAgent
 
-
 class NamedCritic(TimeAgent, SeedableAgent, SerializableAgent):
     def __init__(
         self,

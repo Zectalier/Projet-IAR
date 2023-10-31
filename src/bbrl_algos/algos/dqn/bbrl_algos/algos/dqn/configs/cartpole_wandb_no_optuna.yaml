@@ -1,0 +1,79 @@
+
+# Caution: use only the 'suggest_type' in case of using optuna
+save_best: True
+plot_agents: True
+collect_stats: False
+
+log_dir: ./tmp
+video_dir: ${log_dir}/videos
+
+hydra:
+  run:
+    dir: ${log_dir}/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+logger:
+  classname: bbrl.utils.logger.WandbLogger
+  project: "dqn_vec"
+  group: "test_optuna_optim"
+  tags: "test_vec_dqn"
+  job_type: test
+  log_dir: ${log_dir}
+  cache_size: 10000
+  every_n_seconds: 10
+  verbose: False
+
+env:
+  identifier: CartPole-v1
+  render_mode: rgb_array
+  name: env
+
+gym_env_train:
+  classname: __main__.make_env
+  identifier: ${env.identifier}
+  render_mode: ${env.render_mode}
+  autoreset: True
+
+gym_env_eval:
+  classname: __main__.make_env
+  identifier: ${env.identifier}
+  render_mode: ${env.render_mode}
+  autoreset: False
+
+algorithm:
+  architecture:
+    hidden_sizes: [64, 64]
+
+  seed:
+    train: 335
+    eval: 983
+    q: 123
+    explorer: 456
+    torch: 789
+
+  explorer:
+    epsilon_start: 0.7
+    epsilon_end: 0.2
+    decay: 0.999
+
+  buffer:
+    max_size: 15000
+    batch_size: 256
+    learning_starts: 2000
+
+  target_critic_update_interval: 10
+  max_grad_norm: 1.2
+
+  n_envs_eval: 10
+  n_envs_train: 5
+  n_steps_train: 50
+
+  optim_n_updates: 3
+  discount_factor: 0.99
+
+  n_steps: 70_000
+  eval_interval: 1000
+
+
+optimizer:
+  classname: torch.optim.Adam
+  lr: 5e-4

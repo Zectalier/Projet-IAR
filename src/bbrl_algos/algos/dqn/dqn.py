@@ -51,7 +51,7 @@ from bbrl.agents.gymnasium import make_env, ParallelGymAgent
 from functools import partial
 
 
-matplotlib.use("TkAgg")
+matplotlib.use("Agg")
 
 
 def local_get_env_agents(cfg):
@@ -96,10 +96,13 @@ def compute_critic_loss(
     """
     if q_target is None:
         q_target = q_values
+
     max_q = q_target[1].amax(dim=-1).detach()
     target = reward[1] + discount_factor * max_q * must_bootstrap[1]
+
     act = action[0].unsqueeze(dim=-1)
     qvals = q_values[0].gather(dim=1, index=act).squeeze(dim=1)
+
     return nn.MSELoss()(qvals, target)
 
 
@@ -316,9 +319,12 @@ def run_dqn(cfg, logger, trial=None):
         # All rewards, dimensions (# of evaluations x # of episodes)
         stats_data = torch.stack(stats_data, axis=-1)
         print(np.shape(stats_data))
-        np.savetxt(filename, stats_data.numpy())
+        np.savetxt(filename, stats_data.numpy(), fmt='%.4f', delimiter=' ')
         fo.flush()
         fo.close()
+
+    # Save Pytorch model
+    torch.save(best_agent.agent.agents[1].model, "/users/nfs/Etu7/21201287/Documents/bbrl_algos/src/bbrl_algos/algos/dqn/" + cfg.gym_env.env_name + ".pt")
     
     return best_reward
 

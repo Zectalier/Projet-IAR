@@ -1,0 +1,83 @@
+# Caution: use only the 'suggest_type' in case of using optuna
+save_best: True
+plot_agents: True
+collect_stats: False
+
+log_dir: ./tmp
+video_dir: ${log_dir}/videos
+
+hydra:
+  run:
+    dir: ${log_dir}/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+optuna:
+  study:
+    _target_: optuna.create_study
+    study_name: dqn_vec
+    direction: maximize
+    pruner:
+      _target_: optuna.pruners.MedianPruner
+      n_startup_trials: 5
+      n_warmup_steps: 5
+      interval_steps: 1
+  optimize:
+    n_trials: 10
+    timeout: 600
+    n_jobs: 1
+
+logger:
+  classname: bbrl.utils.logger.TFLogger
+  log_dir: ${log_dir}
+  cache_size: 10000
+  every_n_seconds: 10
+  verbose: False
+
+gym_env:
+  env_name: MazeMDP-v0
+  render_mode: rgb_array
+
+algorithm:
+  architecture:
+    hidden_sizes:
+      suggest_type: categorical
+      choices:
+          - [4, 4]
+          - [8, 8]
+          - [16, 16]
+          - [40, 30]
+
+  seed:
+    train: 32
+    eval: 99
+    q: 123
+    explorer: 456
+    torch: 789
+
+  explorer:
+    epsilon_start: 0.7
+    epsilon_end: 0.2
+    decay: 0.999
+
+  buffer:
+    max_size: 1500
+    batch_size: 256
+
+  target_critic_update_interval: 100
+  max_grad_norm: 0.5
+
+  nb_evals: 100
+  n_envs: 2
+  n_steps_train: 100
+  eval_interval: 2000
+
+  optim_n_updates: 3
+  discount_factor: 0.99
+  gae_factor: 0.8
+
+  n_episodes: 1000
+  n_steps: 60_000
+
+
+optimizer:
+  classname: torch.optim.Adam
+  lr: 5e-4

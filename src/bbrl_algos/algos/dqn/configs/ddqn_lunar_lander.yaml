@@ -26,11 +26,11 @@ algorithm:
     hidden_sizes: [512, 512]
 
   seed:
-    train: 1
-    eval: 99
-    q: 1
-    explorer: 456
-    torch: 789
+    train: 123
+    eval: 456
+    q: 789
+    explorer: 101112
+    torch: 131415
 
   explorer:
     epsilon_start: 0.7
@@ -52,7 +52,7 @@ algorithm:
   optim_n_updates: 3
   discount_factor: 0.99
 
-  n_steps: 5_000
+  n_steps: 2_000_000
   eval_interval: 1000
   n_updates: 32
 

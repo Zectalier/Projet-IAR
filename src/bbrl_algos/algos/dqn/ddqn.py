@@ -95,16 +95,21 @@ def compute_critic_loss(
         torch.Scalar: The loss
     """
     
-    best_action = q_values[1].argmax(dim=-1).detach()
+    with torch.no_grad():
+        # Select the action according to the current Q-network
+        current_q_values = q_values[1]
+        selected_actions = current_q_values.argmax(dim=-1)
+        
+        # Estimate the Q-value of the selected action using the target Q-network
+        target_q_values = q_target[1].gather(dim=-1, index=selected_actions.unsqueeze(-1)).squeeze(-1)
+        target = reward[1] + discount_factor * target_q_values * must_bootstrap[1]
 
-    max_q = q_target[1].gather(-1, best_action.unsqueeze(-1)).squeeze().detach()
+    # Get the Q-value of the action taken from the current Q-network
+    qvals = q_values[0].gather(dim=1, index=action[0].unsqueeze(dim=-1)).squeeze(dim=1)
 
-    target = reward[1] + discount_factor * max_q * must_bootstrap[1]
-
-    act = action[0].unsqueeze(dim=-1)
-    qvals = q_values[0].gather(dim=1, index=act).squeeze(dim=1)
-
+    # Compute the loss
     return nn.MSELoss()(qvals, target)
+
 
 
 # %%
@@ -134,7 +139,7 @@ def create_dqn_agent(cfg_algo, train_env_agent, eval_env_agent):
         seed=cfg_algo.seed.explorer,
     )
     q_agent = TemporalAgent(critic)
-    target_q_agent = TemporalAgent(critic)
+    target_q_agent = TemporalAgent(target_critic)
 
     tr_agent = Agents(train_env_agent, critic, explorer)  # , PrintAgent())
     ev_agent = Agents(eval_env_agent, critic)
@@ -162,10 +167,10 @@ def run_dqn(cfg, logger, trial=None):
     best_agent = None
 
     if cfg.collect_stats:
-        directory = "./dqn_data/"
+        directory = "./ddqn_data/"
         if not os.path.exists(directory):
             os.makedirs(directory)
-        filename = directory + "dqn_" + cfg.gym_env.env_name + ".data"
+        filename = directory + "ddqn_" + cfg.gym_env.env_name + ".data"
         fo = open(filename, "wb")
         stats_data = []
 
@@ -188,6 +193,7 @@ def run_dqn(cfg, logger, trial=None):
     # 6) Define the steps counters
     nb_steps = 0
     tmp_steps_eval = 0
+    last_critic_update_step = 0
 
     while nb_steps < cfg.algorithm.n_steps:
         # Decay the explorer epsilon
@@ -263,6 +269,11 @@ def run_dqn(cfg, logger, trial=None):
 
         optimizer.step()
 
+        # Update the target network 
+        if nb_steps - last_critic_update_step > cfg.algorithm.target_critic_update_interval:
+            last_critic_update_step = nb_steps
+            target_q_agent.agent = copy.deepcopy(q_agent.agent)
+
         # Evaluate the agent
         if nb_steps - tmp_steps_eval > cfg.algorithm.eval_interval:
             tmp_steps_eval = nb_steps
@@ -295,8 +306,8 @@ def run_dqn(cfg, logger, trial=None):
                     eval_agent,
                     cfg.gym_env.env_name,
                     best_reward,
-                    "./dqn_best_agents/",
-                    "dqn",
+                    "./ddqn_best_agents/",
+                    "ddqn",
                 )
                 if cfg.plot_agents:
                     critic = eval_agent.agent.agents[1]
@@ -304,7 +315,7 @@ def run_dqn(cfg, logger, trial=None):
                         critic,
                         eval_env_agent,
                         best_reward,
-                        "./dqn_plots/",
+                        "./ddqn_plots/",
                         cfg.gym_env.env_name,
                         input_action="policy",
                     )
@@ -312,7 +323,7 @@ def run_dqn(cfg, logger, trial=None):
                         critic,
                         eval_env_agent,
                         best_reward,
-                        "./dqn_plots2/",
+                        "./ddqn_plots2/",
                         cfg.gym_env.env_name,
                         input_action=None,
                     )
@@ -328,7 +339,7 @@ def run_dqn(cfg, logger, trial=None):
         # All rewards, dimensions (# of evaluations x # of episodes)
         stats_data = torch.stack(stats_data, axis=-1)
         print(np.shape(stats_data))
-        np.savetxt(filename, stats_data.numpy())
+        np.savetxt(filename, stats_data.numpy(), fmt='%.4f', delimiter=' ')
         fo.flush()
         fo.close()
     
@@ -339,7 +350,7 @@ def run_dqn(cfg, logger, trial=None):
 @hydra.main(
     config_path="configs/",
     # config_name="dqn_cartpole.yaml",
-    config_name="ddqn_lunar_lander.yaml",
+    config_name="ddqn_lunar_lander_optuna.yaml",
 )  # , version_base="1.3")
 def main(cfg_raw: DictConfig):
     torch.random.manual_seed(seed=cfg_raw.algorithm.seed.torch)
