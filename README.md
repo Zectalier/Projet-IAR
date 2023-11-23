@@ -1,8 +1,8 @@
-# BBRL - ALGOS
+# BBRL - ALGOS + REDQ and DroQ
 
 ## Description
 
-This library is designed for education purposes, it is mainly used to perform some practical experiences with various RL algorithms. It facilitates using optuna for tuning hyper-parameters and using rliable and statistical tests for analyzing the results.
+This is the subject of a university research project in which we had to conduct a reproducibility study of a Reinforcement Learning article using the DroQ algorithm based on REDQ. Since the library only contained the SAC algorithm, we implemented REDQ and DroQ ourselves. This library is designed for education purposes, it is mainly used to perform some practical experiences with various RL algorithms. It facilitates using optuna for tuning hyper-parameters and using rliable and statistical tests for analyzing the results.
 
 ## Installation
 

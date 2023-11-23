@@ -15,8 +15,8 @@ algorithm:
             actor: 123
             torch: 7
       sigma: 0.1
-      n_envs: 1
-      nb_evals: 10
+      n_envs_train: 1
+      n_envs_eval: 10
       n_steps: 70000
       noise_multiplier: 0.99
       pop_size: 10

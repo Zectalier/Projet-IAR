@@ -19,8 +19,6 @@ import torch
 import torch.nn as nn
 
 # %%
-from bbrl.agents.gymnasium import record_video
-from moviepy.editor import ipython_display as video_display
 import gymnasium as gym
 from gymnasium import Env
 from gymnasium.wrappers import AutoResetWrapper
@@ -38,7 +36,6 @@ from bbrl_algos.models.utils import save_best
 from bbrl.visu.plot_critics import plot_discrete_q, plot_critic
 from bbrl_algos.models.hyper_params import launch_optuna
 
-from bbrl.utils.functional import gae
 from bbrl.utils.chrono import Chrono
 
 # HYDRA_FULL_ERROR = 1
@@ -51,7 +48,7 @@ from bbrl.agents.gymnasium import make_env, ParallelGymAgent
 from functools import partial
 
 
-matplotlib.use("Agg")
+matplotlib.use("TkAgg")
 
 
 def local_get_env_agents(cfg):
@@ -96,13 +93,11 @@ def compute_critic_loss(
     """
     if q_target is None:
         q_target = q_values
-
     max_q = q_target[1].amax(dim=-1).detach()
     target = reward[1] + discount_factor * max_q * must_bootstrap[1]
-
     act = action[0].unsqueeze(dim=-1)
-    qvals = q_values[0].gather(dim=1, index=act).squeeze(dim=1)
-
+    qvals = q_values[0].gather(dim=1, index=act)
+    qvals = qvals.squeeze(dim=1)
     return nn.MSELoss()(qvals, target)
 
 
@@ -115,7 +110,6 @@ def create_dqn_agent(cfg_algo, train_env_agent, eval_env_agent):
     # act_shape = act_space.shape if len(act_space.shape) > 0 else act_space.n
 
     state_dim, action_dim = train_env_agent.get_obs_and_actions_sizes()
-    print(cfg_algo.architecture.hidden_sizes)
 
     critic = DiscreteQAgent(
         state_dim=state_dim,
@@ -155,8 +149,6 @@ def setup_optimizer(optimizer_cfg, q_agent):
 # %%
 def run_dqn(cfg, logger, trial=None):
     best_reward = float("-inf")
-    best_agent = None
-
     if cfg.collect_stats:
         directory = "./dqn_data/"
         if not os.path.exists(directory):
@@ -167,8 +159,6 @@ def run_dqn(cfg, logger, trial=None):
 
     # 1) Create the environment agent
     train_env_agent, eval_env_agent = local_get_env_agents(cfg)
-    print(train_env_agent.envs[0])
-    print(eval_env_agent.envs[0])
 
     # 2) Create the DQN-like Agent
     train_agent, eval_agent, q_agent = create_dqn_agent(
@@ -270,7 +260,6 @@ def run_dqn(cfg, logger, trial=None):
 
             if mean > best_reward:
                 best_reward = mean
-                best_agent = copy.deepcopy(eval_agent)
 
             print(
                 f"nb_steps: {nb_steps}, reward: {mean:.02f}, best: {best_reward:.02f}"
@@ -319,13 +308,10 @@ def run_dqn(cfg, logger, trial=None):
         # All rewards, dimensions (# of evaluations x # of episodes)
         stats_data = torch.stack(stats_data, axis=-1)
         print(np.shape(stats_data))
-        np.savetxt(filename, stats_data.numpy(), fmt='%.4f', delimiter=' ')
+        np.savetxt(filename, stats_data.numpy())
         fo.flush()
         fo.close()
 
-    # Save Pytorch model
-    torch.save(best_agent.agent.agents[1].model, "/users/nfs/Etu7/21201287/Documents/bbrl_algos/src/bbrl_algos/algos/dqn/" + cfg.gym_env.env_name + ".pt")
-    
     return best_reward
 
 
@@ -344,9 +330,6 @@ def main(cfg_raw: DictConfig):
         logger = Logger(cfg_raw)
         run_dqn(cfg_raw, logger)
 
-    print('End of training...')
-
-    # 
 
 if __name__ == "__main__":
     main()

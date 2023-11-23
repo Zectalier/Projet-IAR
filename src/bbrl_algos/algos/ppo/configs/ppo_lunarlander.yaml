@@ -10,35 +10,35 @@
 
     algorithm:
       seed:
-        train: 335
-        eval: 983
+        train: 2
+        eval: 99
         policy: 123
         torch: 789
 
-      max_grad_norm: 0.5
+      max_grad_norm: 0.8
       n_envs: 10
-      n_steps_train: 50
-      eval_interval: 2000
+      n_steps_train: 250
+      eval_interval: 10_000
       nb_evals: 10
-      gae: 0.9
-      n_steps: 300_000
-      beta: 5.
-      discount_factor: 0.95
+      gae: 0.7
+      n_steps: 3_000_000
+      beta: 10
+      discount_factor: 0.9
       clip_range: 0.2
       clip_range_vf: 0
-      entropy_coef: 2e-7
-      critic_coef: 0.4
-      policy_coef: 1
-      opt_epochs: 3
-      batch_size: 16
-      policy_type: DiscreteActor
+      entropy_coef: 0.0
+      critic_coef: 0.5
+      policy_coef: 0.8
+      opt_epochs: 5
+      batch_size: 256
+      policy_type: DiscretePPOActor
       architecture:
-        policy_hidden_size: [256, 256]
-        critic_hidden_size: [256, 256]
+        policy_hidden_size: [400, 300]
+        critic_hidden_size: [400, 300]
 
     gym_env:
       env_name: LunarLander-v2
 
     optimizer:
       classname: torch.optim.Adam
-      lr: 0.0003
+      lr: 0.0008

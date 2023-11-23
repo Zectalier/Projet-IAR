@@ -1,6 +1,5 @@
-# Caution: use only the 'suggest_type' in case of using optuna
-save_best: True
-plot_agents: True
+save_best: False
+plot_agents: False
 collect_stats: True
 
 log_dir: ./tmp
@@ -18,44 +17,45 @@ logger:
   verbose: False
 
 gym_env:
-  env_name: CartPole-v1
+  env_name: supertuxkart-flattened-discrete-v0
   render_mode: rgb_array
+  use_ai: False
 
 algorithm:
   architecture:
-    hidden_sizes: [64, 64]
+    hidden_sizes: [512, 512]
 
   seed:
-    train: 32
+    train: 1
     eval: 99
-    q: 123
+    q: 1
     explorer: 456
     torch: 789
 
   explorer:
     epsilon_start: 0.7
-    epsilon_end: 0.2
-    decay: 0.999
+    epsilon_end: 0.05
+    decay: 0.996
 
   buffer:
-    max_size: 150000
-    batch_size: 256
+    max_size: 20_000
+    batch_size: 500
     learning_starts: 2000
 
-  target_critic_update_interval: 100
-  max_grad_norm: 0.5
+  target_critic_update_interval: 50
+  max_grad_norm: 1.5
 
   nb_evals: 10
-  n_envs: 10
+  n_envs: 1
   n_steps_train: 50
 
   optim_n_updates: 3
-  discount_factor: 0.9
+  discount_factor: 0.99
 
-  n_steps: 300_000
+  n_steps: 900_000
   eval_interval: 1000
 
 
 optimizer:
   classname: torch.optim.Adam
-  lr: 5e-4
+  lr: 0.001

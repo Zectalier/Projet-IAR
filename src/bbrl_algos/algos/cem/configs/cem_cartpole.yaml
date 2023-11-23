@@ -16,8 +16,8 @@ algorithm:
             torch: 7
 
       sigma: 0.2
-      n_envs: 1
-      nb_evals: 10
+      n_envs_train: 1
+      n_envs_eval: 10
       noise_multiplier: 0.999
       pop_size: 10
       elites_nb: 5

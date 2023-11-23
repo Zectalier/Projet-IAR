@@ -51,7 +51,7 @@ from bbrl_algos.models.stochastic_actors import (
     SquashedGaussianActor,
     StateDependentVarianceContinuousActor,
     ConstantVarianceContinuousActor,
-    DiscreteActor,
+    DiscretePPOActor,
     BernoulliActor,
 )
 from bbrl_algos.models.critics import VAgent
@@ -109,10 +109,15 @@ def setup_optimizer(cfg, actor, critic):
 
 def compute_advantage(cfg, reward, must_bootstrap, v_value):
     # Compute temporal difference with GAE
+    reward = reward[1]
+    next_val = v_value[1]
+    mb = must_bootstrap[1]
+    current_val = v_value[0]
     advantage = gae(
-        v_value,
         reward,
-        must_bootstrap,
+        next_val,
+        mb,
+        current_val,
         cfg.algorithm.discount_factor,
         cfg.algorithm.gae,
     )
@@ -209,9 +214,6 @@ def run_ppo_clip(cfg, logger, trial=None):
         ]
         nb_steps += action[0].shape[0]
 
-        # Determines whether values of the critic should be propagated
-        must_bootstrap = ~terminated[1]
-
         # the critic values are clamped to move not too far away from the values of the previous critic
 
         if cfg.algorithm.clip_range_vf > 0:
@@ -224,10 +226,10 @@ def run_ppo_clip(cfg, logger, trial=None):
             )
 
         # then we compute the advantage using the clamped critic values
-        advantage = compute_advantage(cfg, reward, must_bootstrap, v_value)
+        advantage = compute_advantage(cfg, reward, ~terminated, v_value)
 
         # We store the advantage into the transition_workspace
-        transition_workspace.set("advantage", 1, advantage[0])
+        transition_workspace.set("advantage", 0, advantage)
 
         critic_loss = compute_critic_loss(advantage)
         loss_critic = cfg.algorithm.critic_coef * critic_loss
@@ -274,7 +276,7 @@ def run_ppo_clip(cfg, logger, trial=None):
 
             # Compute the policy loss
             # (using compute_clip_policy_loss)
-            policy_advantage = advantage.detach()[1]
+            policy_advantage = advantage.detach()[0]
             policy_loss = compute_clip_policy_loss(cfg, policy_advantage, ratios)
 
             loss_policy = -cfg.algorithm.policy_coef * policy_loss
@@ -308,7 +310,7 @@ def run_ppo_clip(cfg, logger, trial=None):
                 eval_workspace,
                 t=0,
                 stop_variable="env/done",
-                stochastic=True,
+                stochastic=False,
                 predict_proba=False,
             )
             rewards = eval_workspace["env/cumulated_reward"][-1]
@@ -352,10 +354,10 @@ def run_ppo_clip(cfg, logger, trial=None):
 @hydra.main(
     config_path="./configs/",
     # config_name="ppo_lunarlander_continuous.yaml",
-    # config_name="ppo_lunarlander.yaml",
+    config_name="ppo_lunarlander.yaml",
     # config_name="ppo_swimmer.yaml",
     # config_name="ppo_pendulum.yaml",
-    config_name="ppo_cartpole.yaml",
+    # config_name="ppo_cartpole.yaml",
     # config_name="ppo_single_state.yaml",
     # config_name="ppo_cartpole_continuous.yaml",
     # version_base="1.1",

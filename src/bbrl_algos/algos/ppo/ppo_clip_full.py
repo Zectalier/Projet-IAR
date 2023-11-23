@@ -98,10 +98,14 @@ def setup_optimizer(cfg, actor, critic):
 
 def compute_advantage(cfg, reward, must_bootstrap, v_value):
     # Compute temporal difference with GAE
+    next_val = v_value[1]
+    current_val = v_value[0]
+    reward = reward[1]
     advantage = gae(
-        v_value,
         reward,
+        next_val,
         must_bootstrap,
+        current_val,
         cfg.algorithm.discount_factor,
         cfg.algorithm.gae,
     )
@@ -299,8 +303,6 @@ def run_ppo_clip(cfg, logger, trial=None):
             ]
             nb_steps += action[0].shape[0]
 
-            print("advantage full", advantage)
-            print("advantage [0]", advantage[0])
             critic_loss = compute_critic_loss(advantage[0])
             # critic_loss = action_logp[0][0]
             loss_critic = cfg.algorithm.critic_coef * critic_loss

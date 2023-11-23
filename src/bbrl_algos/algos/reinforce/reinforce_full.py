@@ -60,7 +60,6 @@ def apply_discounted_sum_minus_baseline(cfg, reward, baseline):
     for i in reversed(range(len(reward))):
         reward[i] = reward[i] + cfg.algorithm.discount_factor * tmp - baseline[i]
         tmp = reward[i]
-    # print("final", reward)
     return reward
 
 
@@ -71,15 +70,14 @@ def create_reinforce_agent(cfg, env_agent):
         obs_size, cfg.algorithm.architecture.actor_hidden_size, act_size
     )
     # print_agent = PrintAgent()
-    tr_agent = Agents(env_agent, action_agent)  # , print_agent)
-
+    tr_agent = Agents(env_agent, action_agent)
     critic_agent = TemporalAgent(
         VAgent(obs_size, cfg.algorithm.architecture.critic_hidden_size)
     )
 
     # Get an agent that is executed on a complete workspace
     train_agent = TemporalAgent(tr_agent)
-    return train_agent, critic_agent  # , print_agent
+    return train_agent, critic_agent
 
 
 # Configure the optimizer over the a2c agent
@@ -94,21 +92,12 @@ def compute_critic_loss(cfg, reward, must_bootstrap, v_value):
     # Compute temporal difference
     # print(f"reward:{reward}, V:{v_value}, MB:{must_bootstrap}")
     target = (
-        reward[:-1]
+        reward[1:]
         + cfg.algorithm.discount_factor
         * v_value[1:].detach()
         * must_bootstrap[1:].int()
     )
     td = target - v_value[:-1]
-    """
-    td = gae(
-        v_value,
-        reward,
-        must_bootstrap[:-1],
-        cfg.algorithm.discount_factor,
-        cfg.algorithm.gae,
-    )
-    """
 
     # Compute critic loss
     td_error = td**2
@@ -159,7 +148,7 @@ def run_reinforce(cfg, logger, trial=None):
         ]
         critic_agent(train_workspace, stop_variable="env/done")
         v_value = train_workspace["critic/v_values"]
-        for i in range(cfg.algorithm.n_envs):
+        for i in range(cfg.algorithm.n_envs_eval):
             nb_steps += len(action[:, i])
 
         # Determines whether values of the critic should be propagated

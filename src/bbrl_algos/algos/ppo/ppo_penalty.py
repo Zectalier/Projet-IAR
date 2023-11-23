@@ -53,7 +53,7 @@ from bbrl_algos.models.stochastic_actors import (
     SquashedGaussianActor,
     StateDependentVarianceContinuousActor,
     ConstantVarianceContinuousActor,
-    DiscreteActor,
+    DiscretePPOActor,
     BernoulliActor,
 )
 from bbrl_algos.models.critics import VAgent
@@ -116,10 +116,15 @@ def setup_optimizer(cfg, policy, critic):
 
 def compute_advantage(cfg, reward, must_bootstrap, v_value):
     # Compute temporal difference with GAE
+    reward = reward[1]
+    next_val = v_value[1]
+    mb = must_bootstrap[1]
+    current_val = v_value[0]
     advantage = gae(
-        v_value,
         reward,
-        must_bootstrap,
+        next_val,
+        mb,
+        current_val,
         cfg.algorithm.discount_factor,
         cfg.algorithm.gae,
     )
@@ -135,8 +140,6 @@ def compute_critic_loss(advantage):
 def compute_penalty_policy_loss(cfg, advantage, ratio, kl_loss):
     """Computes the PPO loss including KL regularization"""
     policy_loss = (advantage * ratio - cfg.algorithm.beta * kl_loss).mean()
-    # print("a:", advantage * ratio)
-    # print("k", cfg.algorithm.beta * kl_loss)
     return policy_loss
 
 
@@ -222,10 +225,6 @@ def run_ppo_penalty(cfg, logger, trial=None):
         ]
         nb_steps += action[0].shape[0]
 
-        # Determines whether values of the critic should be propagated
-        # True if the episode reached a time limit or if the task was not done
-        must_bootstrap = ~terminated[1]
-
         assert (
             old_v_value.shape == v_value.shape
         ), f"{old_v_value.shape}[{old_v_value}]/{v_value.shape}[{v_value}]"
@@ -240,10 +239,10 @@ def run_ppo_penalty(cfg, logger, trial=None):
             )
 
         # then we compute the advantage using the clamped critic values
-        advantage = compute_advantage(cfg, reward, must_bootstrap, v_value)
+        advantage = compute_advantage(cfg, reward, ~terminated, v_value)
 
         # We store the advantage into the transition_workspace
-        transition_workspace.set("advantage", 1, advantage[0])
+        transition_workspace.set("advantage", 0, advantage)
 
         critic_loss = compute_critic_loss(advantage)
         loss_critic = cfg.algorithm.critic_coef * critic_loss
@@ -288,7 +287,7 @@ def run_ppo_penalty(cfg, logger, trial=None):
             act_diff = action_logp[0] - old_action_logp[0].detach()
             ratios = act_diff.exp()
 
-            policy_advantage = advantage.detach()[1]
+            policy_advantage = advantage.detach()[0]
             policy_loss = compute_penalty_policy_loss(cfg, policy_advantage, ratios, kl)
             loss_policy = -cfg.algorithm.policy_coef * policy_loss
 
@@ -320,7 +319,7 @@ def run_ppo_penalty(cfg, logger, trial=None):
                 eval_workspace,
                 t=0,
                 stop_variable="env/done",
-                stochastic=True,
+                stochastic=False,
                 predict_proba=False,
             )
             rewards = eval_workspace["env/cumulated_reward"][-1]
@@ -384,12 +383,14 @@ def run_ppo_penalty(cfg, logger, trial=None):
 )
 def main(cfg_raw: DictConfig):
     torch.random.manual_seed(seed=cfg_raw.algorithm.seed.torch)
+    chrono = Chrono()
 
     if "optuna" in cfg_raw:
         launch_optuna(cfg_raw, run_ppo_penalty)
     else:
         logger = Logger(cfg_raw)
         run_ppo_penalty(cfg_raw, logger)
+    chrono.stop()
 
 
 if __name__ == "__main__":

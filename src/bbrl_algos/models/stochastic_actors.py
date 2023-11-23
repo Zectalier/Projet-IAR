@@ -4,9 +4,14 @@ import torch.nn as nn
 from bbrl_algos.models.actors import BaseActor
 from bbrl.agents import TimeAgent, SeedableAgent, SerializableAgent
 
-from torch.distributions.normal import Normal
-from torch.distributions import Bernoulli, Independent
 from bbrl.utils.distributions import SquashedDiagGaussianDistribution
+from torch.distributions import (
+    Normal,
+    Bernoulli,
+    Independent,
+    TransformedDistribution,
+    TanhTransform,
+)
 
 from bbrl_algos.models.shared_models import (
     build_mlp,
@@ -107,6 +112,69 @@ class DiscreteActor(BaseActor):
     ):
         super().__init__(*args, **kwargs)
         self.model = build_mlp(
+            [state_dim] + list(hidden_size) + [n_actions], activation=nn.ReLU()
+        )
+        self.set_name(name)
+
+    def set_name(self, name):
+        self.name = name
+
+    def get_distribution(self, obs):
+        scores = self.model(obs)
+        probs = torch.softmax(scores, dim=-1)
+        return torch.distributions.Categorical(probs), scores
+
+    def forward(
+        self, t, stochastic=False, predict_proba=False, compute_entropy=False, **kwargs
+    ):
+        """
+        Compute the action given either a time step (looking into the workspace)
+        or an observation (in kwargs)
+        If predict_proba is true, the agent takes the action already written in the workspace and adds its probability
+        Otherwise, it writes the new action
+        """
+        if "observation" in kwargs:
+            observation = kwargs["observation"]
+        else:
+            observation = self.get(("env/env_obs", t))
+        dist, scores = self.get_distribution(observation)
+        probs = torch.softmax(scores, dim=-1)
+
+        if compute_entropy:
+            entropy = dist.entropy()
+            self.set(("entropy", t), entropy)
+
+        if predict_proba:
+            action = self.get(("action", t))
+            log_prob = probs[torch.arange(probs.size()[0]), action].log()
+            self.set((f"{self.name}/logprob_predict", t), log_prob)
+        else:
+            if stochastic:
+                action = dist.sample()
+            else:
+                action = scores.argmax(1)
+
+            log_probs = probs[torch.arange(probs.size()[0]), action].log()
+
+            self.set(("action", t), action)
+            self.set((f"{self.name}/action_logprobs", t), log_probs)
+
+    def predict_action(self, obs, stochastic=False):
+        dist, scores = self.get_distribution(obs)
+
+        if stochastic:
+            action = dist.sample()
+        else:
+            action = scores.argmax(0)
+        return action
+
+
+class DiscretePPOActor(BaseActor):
+    def __init__(
+        self, state_dim, hidden_size, n_actions, name="policy", *args, **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.model = build_ortho_mlp(
             [state_dim] + list(hidden_size) + [n_actions], activation=nn.ReLU()
         )
         self.set_name(name)
@@ -279,6 +347,7 @@ class ConstantVarianceContinuousActor(StochasticActor):
         return Normal(mean, self.std_param), mean
 
 
+# old version relying on the SB3 version
 class SquashedGaussianActor(StochasticActor):
     def __init__(
         self, state_dim, hidden_layers, action_dim, name="policy", *args, **kwargs
@@ -303,6 +372,64 @@ class SquashedGaussianActor(StochasticActor):
     def test(self, obs, action):
         action_dist = self.get_distribution(obs)
         return action_dist.log_prob(action)
+
+
+class SquashedGaussianActorNew(StochasticActor):
+    def __init__(
+        self,
+        state_dim,
+        hidden_layers,
+        action_dim,
+        min_std=1e-4,
+        name="policy",
+        *args,
+        **kwargs,
+    ):
+        """Creates a new Squashed Gaussian actor
+
+        :param state_dim: The dimension of the state space
+        :param hidden_layers: Hidden layer sizes
+        :param action_dim: The dimension of the action space
+        :param min_std: The minimum standard deviation, defaults to 1e-4
+        """
+        super().__init__(name, *args, **kwargs)
+        self.min_std = min_std
+        backbone_dim = [state_dim] + list(hidden_layers)
+        self.layers = build_backbone(backbone_dim, activation=nn.ReLU())
+        self.backbone = nn.Sequential(*self.layers)
+        self.last_mean_layer = nn.Linear(hidden_layers[-1], action_dim)
+        self.last_std_layer = nn.Linear(hidden_layers[-1], action_dim)
+        # std must be positive
+        self.softplus = nn.Softplus()
+        # cache_size avoids numerical infinites or NaNs when
+        # computing log probabilities
+        self.tanh_transform = TanhTransform(cache_size=1)
+
+    def normal_dist(self, obs: torch.Tensor):
+        # Compute normal distribution given observation(s)
+        backbone_output = self.backbone(obs)
+        mean = self.last_mean_layer(backbone_output)
+        std_out = self.last_std_layer(backbone_output)
+        std = self.softplus(std_out) + self.min_std
+        # Independent ensures that we have a multivariate
+        # Gaussian with a diagonal covariance matrix (given as
+        # a vector `std`)
+        return Independent(Normal(mean, std), 1)
+
+    def forward(self, t, stochastic=True):
+        normal_dist = self.normal_dist(self.get(("env/env_obs", t)))
+        action_dist = TransformedDistribution(normal_dist, [self.tanh_transform])
+        if stochastic:
+            # Uses the re-parametrization trick
+            action = action_dist.rsample()
+        else:
+            action = self.tanh_transform(normal_dist.mode)
+
+        log_prob = action_dist.log_prob(action)
+        # This line allows to deepcopy the actor...
+        self.tanh_transform._cached_x_y = [None, None]
+        self.set(("action", t), action)
+        self.set((f"{self.name}/action_logprobs", t), log_prob)
 
 
 class TunableVariancePPOActor(StochasticActor):

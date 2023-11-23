@@ -1,0 +1,62 @@
+save_best: False
+plot_agents: False
+collect_stats: True
+
+log_dir: ./tmp
+video_dir: ${log_dir}/videos
+
+hydra:
+      run:
+            dir: ${log_dir}/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+logger:
+      classname: bbrl.utils.logger.TFLogger
+      log_dir: ${log_dir}
+      cache_size: 10000
+      every_n_seconds: 10
+      verbose: False
+
+algorithm:
+
+      seed:
+            train: 334
+            eval: 983
+            q: 123
+            explorer: 456
+            torch: 7
+
+      n_envs: 10
+      n_steps_train: 100
+      n_steps: 1_000_000
+      eval_interval: 5000
+      nb_evals: 10
+      buffer_size: 10e6
+      batch_size: 256
+      learning_starts: 10_000
+      tau_target: 0.05
+      max_grad_norm: 0.5
+      discount_factor: 0.99
+
+      entropy_mode: "auto" # "auto" or "fixed"
+      init_entropy_coef: 2e-7
+      actor_type: SquashedGaussianActor
+      architecture:
+            actor_hidden_size: [256, 256] 
+            critic_hidden_size: [512, 512]
+
+
+      # Note: Swimmer-v3 is deprecated, but Swimmer-v4 does not seem to accept an xml_file
+gym_env:
+      env_name: Ant-v4
+
+actor_optimizer:
+      classname: torch.optim.Adam
+      lr: 0.003
+
+critic_optimizer:
+      classname: torch.optim.Adam
+      lr: 0.003
+
+entropy_coef_optimizer:
+      classname: torch.optim.Adam
+      lr: 0.003

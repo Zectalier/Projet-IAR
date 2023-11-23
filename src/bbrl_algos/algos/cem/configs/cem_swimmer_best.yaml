@@ -10,15 +10,10 @@ hydra:
             dir: ${log_dir}/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 logger:
-      classname: bbrl.utils.logger.WandbLogger
-      project: "cem_study"
-      group: "tune_cem"
-      tags: "hp_cem"
-      job_type: test
-      log_dir: ${log_dir}
-      cache_size: 10000
-      every_n_seconds: 10
-      verbose: False
+            classname: bbrl.utils.logger.TFLogger
+            log_dir: ./dqn_logs/
+            verbose: False
+            every_n_seconds: 10
 
 algorithm:
       seed:
@@ -27,11 +22,11 @@ algorithm:
             actor: 123
             torch: 7
       sigma: 0.1
-      n_envs: 1
-      nb_evals: 10
-      n_steps: 1_000_000
+      n_envs_train: 1
+      n_envs_eval: 10
+      n_steps: 5_000_000
       noise_multiplier: 0.99
-      pop_size: 15
+      pop_size: 16
       elites_nb: 5
       actor_type: ContinuousDeterministicActor
       architecture:
@@ -40,4 +35,4 @@ algorithm:
 # Note: Swimmer-v3 is deprecated, but Swimmer-v4 does not seem to accept an xml_file
 gym_env:
       env_name: SwimmerBBRLEnv-v0
-      xml_file: swimmer5.xml
+      xml_file: swimmer3.xml

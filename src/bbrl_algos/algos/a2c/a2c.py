@@ -4,6 +4,8 @@ import os
 import optuna
 import yaml
 
+import bbrl_gymnasium
+
 from omegaconf import DictConfig
 from bbrl import get_arguments, get_class
 from bbrl.workspace import Workspace
@@ -67,18 +69,25 @@ def setup_optimizers(cfg, action_agent, critic_agent):
 
 
 def compute_advantages_loss(cfg, reward, must_bootstrap, v_value):
-    # Compute temporal difference
-    # target = reward[:-1] + cfg.algorithm.discount_factor * v_value[1:].detach() * must_bootstrap.int()
-    # td = target - v_value[:-1]
+    reward = reward[1]
+    next_val = v_value[1]
+    mb = must_bootstrap[1]
+    current_val = v_value[0]
+    print("re", reward)
+    print("next", next_val)
+    print("mb", mb)
+    print("state", current_val)
     advantages = gae(
-        v_value,
         reward,
-        must_bootstrap,
+        next_val,
+        mb,
+        current_val,
         cfg.algorithm.discount_factor,
         cfg.algorithm.gae,
     )
-    # Compute critic loss
-    td = advantages - v_value[:-1]
+    print("post", advantages)
+    td = advantages - current_val
+
     td_error = td**2
     critic_loss = td_error.mean()
     return critic_loss, advantages
@@ -150,13 +159,10 @@ def run_a2c(cfg, logger, trial=None):
         ]
         # print("action", action)
         nb_steps += action[0].shape[0]
-        # Determines whether values of the critic should be propagated
-        # True if the task was not terminated.
-        must_bootstrap = ~terminated
 
         # Compute critic loss
         critic_loss, advantages = compute_advantages_loss(
-            cfg, reward, must_bootstrap, v_value
+            cfg, reward, ~terminated, v_value
         )
         a2c_loss = compute_actor_loss(action_logp, advantages)
 
@@ -233,7 +239,8 @@ def run_a2c(cfg, logger, trial=None):
 
 @hydra.main(
     config_path="./configs/",
-    config_name="a2c_cartpole.yaml",
+    config_name="a2c_line_mdp.yaml",
+    # config_name="a2c_cartpole.yaml",
     # config_name="a2c_pendulum.yaml",
     # config_name="a2c_swimmer.yaml",
     # version_base="1.1",

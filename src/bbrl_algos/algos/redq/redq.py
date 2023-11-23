@@ -12,19 +12,23 @@ from bbrl.utils.chrono import Chrono
 
 from bbrl import get_arguments, get_class
 from bbrl.workspace import Workspace
-from bbrl.agents import Agents, TemporalAgent
+from bbrl.agents import Agents, TemporalAgent, Agent
 
 from bbrl_algos.models.loggers import Logger
 from bbrl.utils.replay_buffer import ReplayBuffer
 
 from bbrl_algos.models.stochastic_actors import (
-    SquashedGaussianActorNew,
+    SquashedGaussianActor,
     TunableVarianceContinuousActor,
     DiscreteActor,
 )
 from bbrl_algos.models.critics import ContinuousQAgent
 from bbrl_algos.models.shared_models import soft_update_params
-from bbrl_algos.models.envs import get_env_agents
+
+import sys
+sys.path.append('/users/nfs/Etu7/21201287/Documents/bbrl_algos/src/')
+from bbrl_algos_local.models.envs import get_env_agents
+
 from bbrl_algos.models.hyper_params import launch_optuna
 from bbrl_algos.models.utils import save_best
 
@@ -36,54 +40,55 @@ import matplotlib
 # HYDRA_FULL_ERROR = 1
 
 
-matplotlib.use("TkAgg")
+matplotlib.use("Agg")
 
 
-# Create the SAC Agent
-def create_sac_agent(cfg, train_env_agent, eval_env_agent):
+# Create the REDQ Agent TODO
+def create_redq_agent(cfg, train_env_agent, eval_env_agent, M):
     obs_size, act_size = train_env_agent.get_obs_and_actions_sizes()
+    
     assert (
         train_env_agent.is_continuous_action()
-    ), "SAC code dedicated to continuous actions"
-    actor = SquashedGaussianActorNew(
+    ), "REDQ code dedicated to continuous actions"
+    actor = SquashedGaussianActor(
         obs_size, cfg.algorithm.architecture.actor_hidden_size, act_size, name="policy"
     )
     tr_agent = Agents(train_env_agent, actor)
     ev_agent = Agents(eval_env_agent, actor)
-    critic_1 = ContinuousQAgent(
-        obs_size,
-        cfg.algorithm.architecture.critic_hidden_size,
-        act_size,
-        name="critic-1",
-    )
-    target_critic_1 = copy.deepcopy(critic_1).set_name("target-critic-1")
-    critic_2 = ContinuousQAgent(
-        obs_size,
-        cfg.algorithm.architecture.critic_hidden_size,
-        act_size,
-        name="critic-2",
-    )
-    target_critic_2 = copy.deepcopy(critic_2).set_name("target-critic-2")
+
+    # Create M critics
+    critics = [
+        ContinuousQAgent(
+            obs_size,
+            cfg.algorithm.architecture.critic_hidden_size,
+            act_size,
+            name=f"critic-{i+1}",
+        )
+        for i in range(M)
+    ]
+    target_critics = [
+        copy.deepcopy(critics[i]).set_name(f"target-critic-{i+1}") for i in range(M)
+    ]
+
     train_agent = TemporalAgent(tr_agent)
     eval_agent = TemporalAgent(ev_agent)
+
     return (
         train_agent,
         eval_agent,
         actor,
-        critic_1,
-        target_critic_1,
-        critic_2,
-        target_critic_2,
+        critics,
+        target_critics,
     )
 
 
 # Configure the optimizer
-def setup_optimizers(cfg, actor, critic_1, critic_2):
+def setup_optimizers(cfg, actor, critics):
     actor_optimizer_args = get_arguments(cfg.actor_optimizer)
     parameters = actor.parameters()
     actor_optimizer = get_class(cfg.actor_optimizer)(parameters, **actor_optimizer_args)
     critic_optimizer_args = get_arguments(cfg.critic_optimizer)
-    parameters = nn.Sequential(critic_1, critic_2).parameters()
+    parameters = [param for critic in critics for param in critic.parameters()]
     critic_optimizer = get_class(cfg.critic_optimizer)(
         parameters, **critic_optimizer_args
     )
@@ -117,9 +122,10 @@ def compute_critic_loss(
     target_q_agents,
     rb_workspace,
     ent_coef,
+    M
 ):
     """
-    Computes the critic loss for a set of $S$ transition samples
+    Computes the critic loss for a set of $S$ transition samples and returns the M critic losses
 
     Args:
         cfg: The experimental configuration
@@ -130,12 +136,13 @@ def compute_critic_loss(
         target_q_agents: The target of the critics (as a TemporalAgent)
         rb_workspace: The transition workspace
         ent_coef: The entropy coefficient
+        M: The number of critics
 
     Returns:
-        Tuple[torch.Tensor, torch.Tensor]: The two critic losses (scalars)
+        Tuple[Tensor]: The critic losses for each critic
     """
 
-    # Compute q_values from both critics with the actions present in the buffer:
+    # Compute q_values from all the critics with the actions present in the buffer:
     # at t, we have Q(s,a) from the (s,a) in the RB
     q_agents(rb_workspace, t=0, n_steps=1)
 
@@ -150,86 +157,101 @@ def compute_critic_loss(
 
         action_logprobs_next = rb_workspace["policy/action_logprobs"]
 
-    q_values_rb_1, q_values_rb_2, post_q_values_1, post_q_values_2 = rb_workspace[
-        "critic-1/q_values",
-        "critic-2/q_values",
-        "target-critic-1/q_values",
-        "target-critic-2/q_values",
-    ]
+    # For each critic, get the q_values and post_q_values
+    q_values_rb = []
+    post_q_values = []
+    for i in range(M):
+        q_values_rb.append(rb_workspace[f"critic-{i+1}/q_values"])
+        post_q_values.append(rb_workspace[f"target-critic-{i+1}/q_values"])
 
-    # [[student]] Compute temporal difference
+    # [[student]] Compute temporal difference error for each critic
+    # Compute the q_next from the M post_q_values
 
-    q_next = torch.min(post_q_values_1[1], post_q_values_2[1]).squeeze(-1)
-    v_phi = q_next - ent_coef * action_logprobs_next[1]
-
+    q_next = torch.min(torch.stack([q[1] for q in post_q_values]), dim=0)[0].squeeze(-1)
+    v_phi = q_next - ent_coef * action_logprobs_next
+    critic_losses = []
+    
     target = reward[-1] + cfg.algorithm.discount_factor * v_phi * must_bootstrap.int()
-    td_1 = target - q_values_rb_1[0].squeeze(-1)
-    td_2 = target - q_values_rb_2[0].squeeze(-1)
-    td_error_1 = td_1**2
-    td_error_2 = td_2**2
-    critic_loss_1 = td_error_1.mean()
-    critic_loss_2 = td_error_2.mean()
+
+    # Compute the critic loss for each critic
+    for i in range(M):
+        td = target - q_values_rb[i].squeeze(-1)
+        td_error = td**2
+        critic_losses.append(td_error.mean())
     # [[/student]]
 
-    return critic_loss_1, critic_loss_2
+    return critic_losses
 
 
 # %%
-def compute_actor_loss(ent_coef, current_actor, q_agents, rb_workspace):
+def compute_actor_loss(ent_coef, current_actor, q_agents, rb_workspace, M):
     """
     Actor loss computation
     :param ent_coef: The entropy coefficient $\alpha$
     :param current_actor: The actor agent (temporal agent)
     :param q_agents: The critics (as temporal agent)
     :param rb_workspace: The replay buffer (2 time steps, $t$ and $t+1$)
+    :param M: The number of critics
     """
 
     # Recompute the q_values from the current actor, not from the actions in the buffer
 
     current_actor(rb_workspace, t=0, n_steps=1, stochastic=True)
     action_logprobs_new = rb_workspace["policy/action_logprobs"]
+    q_values = []
 
     q_agents(rb_workspace, t=0, n_steps=1)
-    q_values_1, q_values_2 = rb_workspace["critic-1/q_values", "critic-2/q_values"]
+    for i in range(M):
+        q_values.append(rb_workspace[f"critic-{i+1}/q_values"])
 
-    current_q_values = torch.min(q_values_1, q_values_2).squeeze(-1)
+    min_tensor = q_values[0]
+    for tensor in q_values[1:]:
+        min_tensor = torch.min(min_tensor, tensor)
+    current_q_values = min_tensor.squeeze(-1)
 
     actor_loss = ent_coef * action_logprobs_new[0] - current_q_values[0]
 
     return actor_loss.mean()
 
 
-def run_sac(cfg, logger, trial=None):
+def run_redq(cfg, logger, trial=None):
     best_reward = float("-inf")
 
     # init_entropy_coef is the initial value of the entropy coef alpha.
     ent_coef = cfg.algorithm.init_entropy_coef
     tau = cfg.algorithm.tau_target
+    # Number of critics
+    M = 128
+    if cfg.collect_stats:
+        directory = "./redq_data/"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        filename = directory + "redq_" + cfg.gym_env.env_name + ".data"
+        fo = open(filename, "wb")
+        stats_data = []
 
     # 2) Create the environment agent
     train_env_agent, eval_env_agent = get_env_agents(cfg)
 
-    # 3) Create the SAC Agent
+    # 3) Create the REDQ Agent
     (
         train_agent,
         eval_agent,
         actor,
-        critic_1,
-        target_critic_1,
-        critic_2,
-        target_critic_2,
-    ) = create_sac_agent(cfg, train_env_agent, eval_env_agent)
+        critics,
+        target_critics,
+    ) = create_redq_agent(cfg, train_env_agent, eval_env_agent, M)
 
     current_actor = TemporalAgent(actor)
-    q_agents = TemporalAgent(Agents(critic_1, critic_2))
-    target_q_agents = TemporalAgent(Agents(target_critic_1, target_critic_2))
+    q_agents = TemporalAgent(Agents(*critics))
+    target_q_agents = TemporalAgent(Agents(*target_critics))
     train_workspace = Workspace()
 
     # Creates a replay buffer
     rb = ReplayBuffer(max_size=cfg.algorithm.buffer_size)
 
     # Configure the optimizer
-    actor_optimizer, critic_optimizer = setup_optimizers(cfg, actor, critic_1, critic_2)
+    actor_optimizer, critic_optimizer = setup_optimizers(cfg, actor, critics)
     entropy_coef_optimizer, log_entropy_coef = setup_entropy_optimizers(cfg)
     nb_steps = 0
     tmp_steps = 0
@@ -275,7 +297,7 @@ def run_sac(cfg, logger, trial=None):
             # Critic update part #
             critic_optimizer.zero_grad()
 
-            (critic_loss_1, critic_loss_2) = compute_critic_loss(
+            critic_losses = compute_critic_loss(
                 cfg,
                 reward,
                 ~terminated[1],
@@ -284,24 +306,26 @@ def run_sac(cfg, logger, trial=None):
                 target_q_agents,
                 rb_workspace,
                 ent_coef,
+                M
             )
 
-            logger.add_log("critic_loss_1", critic_loss_1, nb_steps)
-            logger.add_log("critic_loss_2", critic_loss_2, nb_steps)
-            critic_loss = critic_loss_1 + critic_loss_2
+            for critic_loss in range(len(critic_losses)):
+                logger.add_log(f"critic_loss_{critic_loss}", critic_losses[critic_loss], nb_steps)
+
+            critic_loss = sum(critic_losses)
             critic_loss.backward()
-            torch.nn.utils.clip_grad_norm_(
-                critic_1.parameters(), cfg.algorithm.max_grad_norm
-            )
-            torch.nn.utils.clip_grad_norm_(
-                critic_2.parameters(), cfg.algorithm.max_grad_norm
-            )
+
+            for critic in critics:
+                torch.nn.utils.clip_grad_norm_(
+                    critic.parameters(), cfg.algorithm.max_grad_norm
+                )
+
             critic_optimizer.step()
 
             # Actor update part #
             actor_optimizer.zero_grad()
             actor_loss = compute_actor_loss(
-                ent_coef, current_actor, q_agents, rb_workspace
+                ent_coef, current_actor, q_agents, rb_workspace, M
             )
             logger.add_log("actor_loss", actor_loss, nb_steps)
             actor_loss.backward()
@@ -325,8 +349,8 @@ def run_sac(cfg, logger, trial=None):
             logger.add_log("entropy_coef", ent_coef, nb_steps)
 
             # Soft update of target q function
-            soft_update_params(critic_1, target_critic_1, tau)
-            soft_update_params(critic_2, target_critic_2, tau)
+            for critic, target_critic in zip(critics, target_critics):
+                soft_update_params(critic, target_critic, tau)
             # soft_update_params(actor, target_actor, tau)
 
         # Evaluate
@@ -351,8 +375,18 @@ def run_sac(cfg, logger, trial=None):
             )
             if cfg.save_best and best_reward == mean:
                 save_best(
-                    actor, cfg.gym_env.env_name, mean, "./sac_best_agents/", "sac"
+                    actor, cfg.gym_env.env_name, mean, "./redq_best_agents/", "redq"
                 )
+            if cfg.collect_stats:
+                stats_data.append(rewards)
+    
+    if cfg.collect_stats:
+        # All rewards, dimensions (# of evaluations x # of episodes)
+        stats_data = torch.stack(stats_data, axis=-1)
+        print(np.shape(stats_data))
+        np.savetxt(filename, stats_data.numpy(), fmt='%.4f', delimiter=' ')
+        fo.flush()
+        fo.close()
 
     return best_reward
 
@@ -365,8 +399,8 @@ def load_best(best_filename):
 # %%
 @hydra.main(
     config_path="./configs/",
-    config_name="sac_lunar_lander_continuous.yaml",
-    # config_name="sac_cartpolecontinuous.yaml",
+    # config_name="sac_cartpole.yaml",
+    config_name="redq_cartpolecontinuous.yaml",
     # config_name="sac_pendulum.yaml",
     # config_name="sac_swimmer_optuna.yaml",
     # config_name="sac_swimmer.yaml",
@@ -377,10 +411,10 @@ def main(cfg_raw: DictConfig):
     torch.random.manual_seed(seed=cfg_raw.algorithm.seed.torch)
 
     if "optuna" in cfg_raw:
-        launch_optuna(cfg_raw, run_sac)
+        launch_optuna(cfg_raw, run_redq)
     else:
         logger = Logger(cfg_raw)
-        run_sac(cfg_raw, logger)
+        run_redq(cfg_raw, logger)
 
 
 if __name__ == "__main__":

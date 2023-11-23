@@ -68,17 +68,19 @@ def setup_optimizers(cfg, action_agent, critic_agent):
 
 def compute_advantages_loss(cfg, reward, must_bootstrap, v_value):
     # Compute temporal difference
-    # target = reward[:-1] + cfg.algorithm.discount_factor * v_value[1:].detach() * must_bootstrap.int()
-    # td = target - v_value[:-1]
+    reward = reward[1]
+    next_val = v_value[1]
+    mb = must_bootstrap[1]
+    current_val = v_value[0]
     advantages = gae(
-        v_value,
         reward,
-        must_bootstrap,
+        next_val,
+        mb,
+        current_val,
         cfg.algorithm.discount_factor,
         cfg.algorithm.gae,
     )
-    # Compute critic loss
-    td = advantages - v_value[:-1]
+    td = advantages - current_val
     td_error = td**2
     critic_loss = td_error.mean()
     return critic_loss, advantages

@@ -1,17 +1,23 @@
-      save_best: True
-      plot_agents: True
-
+      save_best: False
+      plot_agents: False
+      collect_stats: True
+      log_dir: ./tmp
       logger:
-            classname: bbrl.utils.logger.TFLogger
-            log_dir: ./sac_logs/
-            verbose: False
+            classname: bbrl.utils.logger.WandbLogger
+            project: "droQ_study_best"
+            group: "tune_droQ"
+            tags: "hp_droQ"
+            job_type: test
+            log_dir: ${log_dir}
+            cache_size: 10000
             every_n_seconds: 10
+            verbose: False
 
       algorithm:
 
             seed:
-                  train: 1
-                  eval: 99
+                  train: 335
+                  eval: 983
                   q: 123
                   explorer: 456
                   torch: 789
@@ -19,28 +25,30 @@
             nb_seeds: 1
             n_envs: 8
             n_steps_train: 32
-            n_steps: 300_000
+            n_steps: 1_500_000
             max_grad_norm: 0.5
-            buffer_size: 1e6
-            batch_size: 256
-            eval_interval: 2_000
+            buffer_size: 2e5
+            batch_size: 64
+            eval_interval: 2000
             nb_evals: 10
-            learning_starts: 10_000
+            learning_starts: 10000
             tau_target: 0.05
-            discount_factor: 0.98
+            discount_factor: 0.99
             entropy_mode: "auto" # "auto" or "fixed"
             init_entropy_coef: 2e-7
             actor_type: SquashedGaussianActor
             architecture:
-                  actor_hidden_size: [64, 64]
+                  actor_hidden_size: [256, 256]
                   critic_hidden_size: [256, 256]
+            utd_ratio: 20
+            M: 2
 
       gym_env:
             env_name: CartPoleContinuous-v1
 
       actor_optimizer:
             classname: torch.optim.Adam
-            lr: 1e-3
+            lr: 1e-4
 
       critic_optimizer:
             classname: torch.optim.Adam
