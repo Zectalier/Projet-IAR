@@ -204,14 +204,12 @@ def compute_actor_loss(ent_coef, current_actor, q_agents, rb_workspace, M):
     for i in range(M):
         q_values.append(rb_workspace[f"critic-{i+1}/q_values"])
 
-    min_tensor = q_values[0]
-    for tensor in q_values[1:]:
-        min_tensor = torch.min(min_tensor, tensor)
-    current_q_values = min_tensor.squeeze(-1)
+    # Compute the q_values sum.
+    current_q_values = sum(q_values) / M
 
-    actor_loss = ent_coef * action_logprobs_new[0] - current_q_values[0]
-
-    return actor_loss.mean()
+    actor_loss = -current_q_values[0].squeeze(-1) - ent_coef * action_logprobs_new[1]
+    
+    return torch.mean(actor_loss)
 
 
 def run_redq(cfg, logger, trial=None):
