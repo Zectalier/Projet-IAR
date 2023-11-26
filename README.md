@@ -17,3 +17,8 @@ We suggest using your favorite python environment (conda, venv, ...) as some fur
 ## Usage
 
 go to src/bbrl_algos, choose your algorithm and run python3 your_algorithm.py
+
+## References
+
+- [**DROPOUT Q-FUNCTIONS FOR DOUBLY EFFICIENT REINFORCEMENT LEARNING**](https://arxiv.org/pdf/2110.02034.pdf)  
+  *Takuya Hiraoka, Takahisa Imagawa, Taisei Hashimoto, Takashi Onishi, Yoshimasa Tsuruoka*
