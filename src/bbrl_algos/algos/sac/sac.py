@@ -18,7 +18,7 @@ from bbrl_algos.models.loggers import Logger
 from bbrl.utils.replay_buffer import ReplayBuffer
 
 from bbrl_algos.models.stochastic_actors import (
-    SquashedGaussianActorNew,
+    SquashedGaussianActor,
     TunableVarianceContinuousActor,
     DiscreteActor,
 )
