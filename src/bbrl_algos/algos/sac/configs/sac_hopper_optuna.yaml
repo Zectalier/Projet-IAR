@@ -20,9 +20,9 @@ optuna:
 
 logger:
       classname: bbrl.utils.logger.WandbLogger
-      project: "droQ_study_fixed"
-      group: "tune_droQ"
-      tags: "hp_droQ"
+      project: "sac_best_hopper_hp"
+      group: "tune_sac"
+      tags: "hp_sac"
       job_type: test
       log_dir: ${log_dir}
       cache_size: 10000
@@ -30,7 +30,6 @@ logger:
       verbose: False
 
 algorithm:
-
       seed:
             train: 335
             eval: 983
@@ -63,13 +62,11 @@ algorithm:
       init_entropy_coef: 2e-7
       actor_type: SquashedGaussianActor
       architecture:
-            actor_hidden_size: [32, 32]
-            critic_hidden_size: [128, 128]
-      utd_ratio: 20
-      M: 2
+            actor_hidden_size: [256, 256] 
+            critic_hidden_size: [512, 512]
 
 gym_env:
-      env_name: CartPoleContinuous-v1
+      env_name: Hopper-v3
 
 actor_optimizer:
       classname: torch.optim.Adam
