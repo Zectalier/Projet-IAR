@@ -36,7 +36,7 @@ import matplotlib
 # HYDRA_FULL_ERROR = 1
 
 
-matplotlib.use("TkAgg")
+#matplotlib.use("TkAgg")
 
 
 # Create the SAC Agent
@@ -45,7 +45,7 @@ def create_sac_agent(cfg, train_env_agent, eval_env_agent):
     assert (
         train_env_agent.is_continuous_action()
     ), "SAC code dedicated to continuous actions"
-    actor = SquashedGaussianActorNew(
+    actor = SquashedGaussianActor(
         obs_size, cfg.algorithm.architecture.actor_hidden_size, act_size, name="policy"
     )
     tr_agent = Agents(train_env_agent, actor)
