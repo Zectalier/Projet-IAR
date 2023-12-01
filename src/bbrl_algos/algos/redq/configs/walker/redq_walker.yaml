@@ -1,7 +1,6 @@
-save_best: False
+﻿save_best: False
 plot_agents: False
 collect_stats: True
-
 stats_directory: ../../../src/bbrl_algos/algos/algorithm_stats/
 
 logger:
@@ -9,6 +8,7 @@ logger:
       log_dir: ./sac_logs/
       verbose: False
       every_n_seconds: 10
+
 
 algorithm:
 
@@ -24,32 +24,31 @@ algorithm:
       n_steps_train: 32
       n_steps: 5_000
       max_grad_norm: 0.5
-      buffer_size: 1e6
-      batch_size: 256
+      buffer_size: 10000000
+      batch_size: 128
       eval_interval: 2000
       nb_evals: 10
       learning_starts: 10000
-      tau_target: 0.05
-      discount_factor: 0.98
+      tau_target: 0.005
+      discount_factor: 0.99
       entropy_mode: "auto" # "auto" or "fixed"
       init_entropy_coef: 2e-7
       actor_type: SquashedGaussianActor
       architecture:
             actor_hidden_size: [32, 32]
-            critic_hidden_size: [256, 256]
-      M: 16
+            critic_hidden_size: [128, 128]
 
 gym_env:
-      env_name: CartPoleContinuous-v1
+      env_name: BipedalWalker-v3
 
 actor_optimizer:
       classname: torch.optim.Adam
-      lr: 1e-3
+      lr: 0.01
 
 critic_optimizer:
       classname: torch.optim.Adam
-      lr: 1e-3
+      lr: 0.01
 
 entropy_coef_optimizer:
       classname: torch.optim.Adam
-      lr: 1e-3
+      lr: 0.01

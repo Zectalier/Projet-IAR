@@ -6,7 +6,7 @@ log_dir: ./tmp
 optuna:
       study:
             _target_: optuna.create_study
-            study_name: sac_best_hopper_hp
+            study_name: redq_best_hopper_hp
             direction: maximize
       pruner:
             _target_: optuna.pruners.MedianPruner
@@ -20,9 +20,9 @@ optuna:
 
 logger:
       classname: bbrl.utils.logger.WandbLogger
-      project: "droQ_study_fixed"
-      group: "tune_droQ"
-      tags: "hp_droQ"
+      project: "redq_study_fixed"
+      group: "tune_redq"
+      tags: "hp_redq"
       job_type: test
       log_dir: ${log_dir}
       cache_size: 10000
@@ -69,7 +69,7 @@ algorithm:
       M: 2
 
 gym_env:
-      env_name: CartPoleContinuous-v1
+      env_name: Hopper-v4
 
 actor_optimizer:
       classname: torch.optim.Adam

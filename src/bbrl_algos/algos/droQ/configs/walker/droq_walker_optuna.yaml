@@ -1,0 +1,91 @@
+﻿save_best: False
+plot_agents: False
+collect_stats: False
+log_dir: ./tmp
+
+optuna:
+      study:
+            _target_: optuna.create_study
+            study_name: sac_best_hopper_walker
+            direction: maximize
+      pruner:
+            _target_: optuna.pruners.MedianPruner
+            n_startup_trials: 100
+            n_warmup_steps: 5
+            interval_steps: 1
+      optimize:
+            n_trials: 10000000
+            timeout: 21600
+            n_jobs: 1
+
+logger:
+      classname: bbrl.utils.logger.WandbLogger
+      project: "sac_study_fixed"
+      group: "tune_sac"
+      tags: "walker_sac"
+      job_type: test
+      log_dir: ${log_dir}
+      cache_size: 10000
+      every_n_seconds: 10
+      verbose: False
+
+algorithm:
+
+      seed:
+            train: 335
+            eval: 983
+            q: 123
+            explorer: 456
+            torch: 789
+
+      nb_seeds: 1
+      n_envs: 8
+      n_steps_train: 32
+      n_steps: 1_500_000
+      max_grad_norm:
+            suggest_type: float
+            low: 0.1
+            high: 1.0
+      buffer_size: 10000000
+      batch_size: 128
+      eval_interval: 2000
+      nb_evals: 10
+      learning_starts: 10000
+      tau_target: 
+            suggest_type: float
+            low: 0.05
+            high: 0.1
+      discount_factor:
+            suggest_type: float
+            low: 0.9
+            high: 0.999
+      entropy_mode: "auto" # "auto" or "fixed"
+      init_entropy_coef: 2e-7
+      actor_type: SquashedGaussianActor
+      architecture:
+            actor_hidden_size: [32, 32]
+            critic_hidden_size: [128, 128]
+
+gym_env:
+      env_name: BipedalWalker-v3
+
+actor_optimizer:
+      classname: torch.optim.Adam
+      lr:
+            suggest_type: float
+            low: 1e-5
+            high: 1e-2
+
+critic_optimizer:
+      classname: torch.optim.Adam
+      lr: 
+            suggest_type: float
+            low: 1e-5
+            high: 1e-2
+
+entropy_coef_optimizer:
+      classname: torch.optim.Adam
+      lr: 
+            suggest_type: float
+            low: 1e-5
+            high: 1e-2

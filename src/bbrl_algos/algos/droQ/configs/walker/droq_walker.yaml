@@ -1,7 +1,6 @@
 ﻿save_best: False
 plot_agents: False
 collect_stats: True
-log_dir: ./tmp
 stats_directory: ../../../src/bbrl_algos/algos/algorithm_stats/
 
 logger:
@@ -38,11 +37,9 @@ algorithm:
       architecture:
             actor_hidden_size: [32, 32]
             critic_hidden_size: [128, 128]
-      utd_ratio: 20
-      M: 2
 
 gym_env:
-      env_name: Hopper-v4
+      env_name: BipedalWalker-v3
 
 actor_optimizer:
       classname: torch.optim.Adam

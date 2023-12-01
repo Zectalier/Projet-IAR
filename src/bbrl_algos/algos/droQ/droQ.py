@@ -27,7 +27,7 @@ from bbrl_algos.models.shared_models import soft_update_params
 
 import sys
 sys.path.append('/users/nfs/Etu7/21201287/Documents/bbrl_algos/src/')
-from bbrl_algos_local.models.envs import get_env_agents
+from bbrl_algos.models.envs import get_env_agents
 
 from bbrl_algos.models.hyper_params import launch_optuna
 from bbrl_algos.models.utils import save_best
@@ -436,13 +436,12 @@ def load_best(best_filename):
 
 # %%
 @hydra.main(
-    config_path="./configs/",
-    # config_name="sac_cartpole.yaml",
-    config_name="droq_cartpolecontinuous.yaml",
-    # config_name="sac_pendulum.yaml",
-    # config_name="sac_swimmer_optuna.yaml",
-    # config_name="sac_swimmer.yaml",
-    # config_name="sac_torcs.yaml",
+    config_path="./configs/hopper/",
+    # config_path="./configs/walker/",
+    config_name="droq_hopper.yaml",
+    # config_name="droq_walker.yaml",
+    # config_name="droq_hopper_optuna.yaml",
+    # config_name="droq_walker_optuna.yaml",
     # version_base="1.3",
 )
 def main(cfg_raw: DictConfig):
