@@ -1,4 +1,4 @@
-﻿save_best: False
+save_best: False
 plot_agents: False
 collect_stats: False
 log_dir: ./tmp
@@ -14,7 +14,7 @@ optuna:
             n_warmup_steps: 5
             interval_steps: 1
       optimize:
-            n_trials: 10000
+            n_trials: 1
             timeout: 21600
             n_jobs: 1
 
@@ -50,14 +50,8 @@ algorithm:
       eval_interval: 2000
       nb_evals: 10
       learning_starts: 10000
-      tau_target: 
-            suggest_type: float
-            low: 0.01
-            high: 0.1
-      discount_factor:
-            suggest_type: float
-            low: 0.9
-            high: 0.999
+      tau_target: 0.02
+      discount_factor: 0.98
       entropy_mode: "auto" # "auto" or "fixed"
       init_entropy_coef: 2e-7
       actor_type: SquashedGaussianActor
@@ -70,21 +64,12 @@ gym_env:
 
 actor_optimizer:
       classname: torch.optim.Adam
-      lr:
-            suggest_type: float
-            low: 1e-5
-            high: 1e-3
+      lr: 7e-4
 
 critic_optimizer:
       classname: torch.optim.Adam
-      lr: 
-            suggest_type: float
-            low: 1e-5
-            high: 1e-3
+      lr: 7e-4
 
 entropy_coef_optimizer:
       classname: torch.optim.Adam
-      lr: 
-            suggest_type: float
-            low: 1e-5
-            high: 1e-3
+      lr: 7e-4

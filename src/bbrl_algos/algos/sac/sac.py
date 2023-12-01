@@ -368,6 +368,7 @@ def load_best(best_filename):
     # config_name="sac_lunar_lander_continuous.yaml",
     # config_name="sac_walker_optuna.yaml",
     config_name="sac_hopper_optuna.yaml",
+    # config_name="sac_hopper_custom.yaml",
     # config_name="sac_cartpolecontinuous.yaml",
     # config_name="sac_pendulum.yaml",
     # config_name="sac_swimmer_optuna.yaml",
