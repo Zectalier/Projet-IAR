@@ -14,7 +14,7 @@ optuna:
             n_warmup_steps: 5
             interval_steps: 1
       optimize:
-            n_trials: 10000
+            n_trials: 10
             timeout: 21600
             n_jobs: 1
 
@@ -40,7 +40,7 @@ algorithm:
       nb_seeds: 1
       n_envs: 8
       n_steps_train: 32
-      n_steps: 1_500_000
+      n_steps: 4_000_000
       max_grad_norm:
             suggest_type: float
             low: 0.1
@@ -52,12 +52,12 @@ algorithm:
       learning_starts: 10000
       tau_target: 
             suggest_type: float
-            low: 0.001
-            high: 0.1
+            low: 0.01
+            high: 0.05
       discount_factor:
             suggest_type: float
-            low: 0.9
-            high: 0.999
+            low: 0.95
+            high: 0.99
       entropy_mode: "auto" # "auto" or "fixed"
       init_entropy_coef: 2e-7
       actor_type: SquashedGaussianActor
@@ -72,19 +72,19 @@ actor_optimizer:
       classname: torch.optim.Adam
       lr:
             suggest_type: float
-            low: 1e-5
+            low: 1e-4
             high: 1e-3
 
 critic_optimizer:
       classname: torch.optim.Adam
       lr: 
             suggest_type: float
-            low: 1e-5
+            low: 1e-4
             high: 1e-3
 
 entropy_coef_optimizer:
       classname: torch.optim.Adam
       lr: 
             suggest_type: float
-            low: 1e-5
+            low: 1e-4
             high: 1e-3
