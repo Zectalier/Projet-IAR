@@ -34,6 +34,7 @@ from bbrl.visu.plot_policies import plot_policy
 from bbrl.visu.plot_critics import plot_critic
 
 import matplotlib
+import warnings
 
 # HYDRA_FULL_ERROR = 1
 
@@ -203,6 +204,7 @@ def compute_actor_loss(ent_coef, current_actor, q_agents, rb_workspace):
 
 def run_sac(cfg, logger, trial=None):
     best_reward = float("-inf")
+    stats_data = []
 
     # init_entropy_coef is the initial value of the entropy coef alpha.
     ent_coef = cfg.algorithm.init_entropy_coef
@@ -404,6 +406,58 @@ def run_sac(cfg, logger, trial=None):
         fo.flush()
         fo.close()
 
+        if cfg.collect_stats:
+            stats_data.append(rewards)
+
+    if cfg.collect_stats:
+        directory = cfg.stats_directory
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        filename = directory + "sac-" + cfg.gym_env.env_name + ".data"
+        # Append the stats_data to the file as a numpy array without overwriting
+
+        # All rewards, dimensions (# of evaluations x # of episodes)
+        stats_data = torch.stack(stats_data, axis=-1)
+
+        # Only create the file if it does not exist.
+        if not os.path.isfile(filename):
+            fo = open(filename, "wb")
+            fo.close()
+
+        old_stats_data = np.array([])
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            try:
+                old_stats_data = np.loadtxt(filename)
+            except:
+                pass
+        
+        if old_stats_data.shape != (0,):
+            # Get the number of episodes in the old data
+            old_n_episodes = old_stats_data.shape[1]
+            # Get the number of episodes in the new data
+            new_n_episodes = stats_data.shape[1]
+
+            # Remove the extra episodes from the new data if there are more episodes in the new data
+            if new_n_episodes > old_n_episodes:
+                stats_data = stats_data[:, :old_n_episodes]
+            # Remove the extra episodes from the old data if there are more episodes in the old data
+            elif new_n_episodes < old_n_episodes:
+                old_stats_data = old_stats_data[:, :new_n_episodes]
+                
+            # Concatenate the new rewards to the existing array
+            new_stats_data = np.concatenate((old_stats_data, stats_data), axis=0)
+            
+            fo = open(filename, "rb+")  # Open in read/write mode
+            np.savetxt(fo, new_stats_data, fmt='%.4f', delimiter=' ')
+        else:
+            fo = open(filename, "wb")
+            np.savetxt(fo, stats_data, fmt='%.4f', delimiter=' ')
+
+        fo.flush()
+        fo.close()
+
     return best_reward
 
 
@@ -414,14 +468,12 @@ def load_best(best_filename):
 
 # %%
 @hydra.main(
-    config_path="./configs/",
-    # config_name="sac_cartpole.yaml",
-    # config_name="sac_cartpolecontinuous_optuna.yaml",
-    config_name="sac_walker_optuna.yaml",
-    # config_name="sac_pendulum.yaml",
-    # config_name="sac_swimmer_optuna.yaml",
-    # config_name="sac_swimmer.yaml",
-    # config_name="sac_torcs.yaml",
+    config_path="./configs/hopper",
+    # config_path="./configs/walker",
+    config_name="sac_hopper.yaml",
+    # config_name="sac_walker.yaml",
+    # config_name="sac_hopper_optuna.yaml",
+    # config_name="sac_walker_optuna.yaml",
     # version_base="1.3",
 )
 def main(cfg_raw: DictConfig):

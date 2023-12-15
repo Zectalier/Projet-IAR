@@ -1,0 +1,56 @@
+﻿save_best: False
+plot_agents: False
+collect_stats: True
+stats_directory: ../../../src/bbrl_algos/algos/algorithm_stats/
+
+logger:
+      classname: bbrl.utils.logger.TFLogger
+      log_dir: ./droQ_logs/
+      verbose: False
+      every_n_seconds: 10
+
+
+algorithm:
+
+      seed:
+            train: 335
+            eval: 983
+            q: 123
+            explorer: 456
+            torch: 789
+
+      nb_seeds: 1
+      n_envs: 8
+      n_steps_train: 32
+      n_steps: 5_000
+      max_grad_norm: 0.5
+      buffer_size: 10000000
+      batch_size: 128
+      eval_interval: 2000
+      nb_evals: 10
+      learning_starts: 10000
+      tau_target: 0.005
+      discount_factor: 0.99
+      entropy_mode: "auto" # "auto" or "fixed"
+      init_entropy_coef: 2e-7
+      actor_type: SquashedGaussianActor
+      architecture:
+            actor_hidden_size: [32, 32]
+            critic_hidden_size: [128, 128]
+      utd_ratio: 20
+      M: 2
+
+gym_env:
+      env_name: Hopper-v4
+
+actor_optimizer:
+      classname: torch.optim.Adam
+      lr: 0.01
+
+critic_optimizer:
+      classname: torch.optim.Adam
+      lr: 0.01
+
+entropy_coef_optimizer:
+      classname: torch.optim.Adam
+      lr: 0.01

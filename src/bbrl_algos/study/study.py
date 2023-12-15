@@ -9,12 +9,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 from bbrl_algos.rliable_stats.tests import run_test
 
-font = {"family": "normal", "size": 22}
+font = {"family": "normal", "size": 70}
 matplotlib.rc("font", **font)
 sys.path.append("../")
 
 
-save = False  # save in ./plot.png if True
+save = True  # save in ./plot.png if True
 
 sac_perfs = np.loadtxt("./data_files/sac_hc_all_perfs.txt")
 td3_perfs = np.loadtxt("./data_files/td3_hc_all_perfs.txt")
@@ -81,7 +81,7 @@ central2, low2, high2 = compute_central_tendency_and_error(
 )
 
 # plot
-fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+fig, ax = plt.subplots(1, 1, figsize=(20, 10))
 lab1 = plt.xlabel("training steps")
 lab2 = plt.ylabel("performance")
 
@@ -107,7 +107,5 @@ ax.spines["left"].set_linewidth(5)
 
 if save:
     plt.savefig(
-        "./plot.png", bbox_extra_artists=(leg, lab1, lab2), bbox_inches="tight", dpi=100
+        "./droq_study.png", bbox_extra_artists=(leg, lab1, lab2), bbox_inches="tight", dpi=100
     )
-
-plt.show()

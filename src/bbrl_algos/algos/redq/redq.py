@@ -27,7 +27,7 @@ from bbrl_algos.models.shared_models import soft_update_params
 
 import sys
 sys.path.append('/users/nfs/Etu7/21201287/Documents/bbrl_algos/src/')
-from bbrl_algos_local.models.envs import get_env_agents
+from bbrl_algos.models.envs import get_env_agents
 
 from bbrl_algos.models.hyper_params import launch_optuna
 from bbrl_algos.models.utils import save_best
@@ -36,6 +36,7 @@ from bbrl.visu.plot_policies import plot_policy
 from bbrl.visu.plot_critics import plot_critic
 
 import matplotlib
+import warnings
 
 # HYDRA_FULL_ERROR = 1
 
@@ -214,20 +215,14 @@ def compute_actor_loss(ent_coef, current_actor, q_agents, rb_workspace, M):
 
 def run_redq(cfg, logger, trial=None):
     best_reward = float("-inf")
+    stats_data = []
 
     # init_entropy_coef is the initial value of the entropy coef alpha.
     ent_coef = cfg.algorithm.init_entropy_coef
     tau = cfg.algorithm.tau_target
     # Number of critics
-    M = 128
-    if cfg.collect_stats:
-        directory = "./redq_data/"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        filename = directory + "redq_" + cfg.gym_env.env_name + ".data"
-        fo = open(filename, "wb")
-        stats_data = []
-
+    M = cfg.algorithm.M
+    
     # 2) Create the environment agent
     train_env_agent, eval_env_agent = get_env_agents(cfg)
 
@@ -284,105 +279,148 @@ def run_redq(cfg, logger, trial=None):
         nb_steps += action[0].shape[0]
         rb.put(transition_workspace)
 
-        if nb_steps > cfg.algorithm.learning_starts:
-            # Get a sample from the workspace
-            rb_workspace = rb.get_shuffled(cfg.algorithm.batch_size)
+        # For G Updates
+        for updates in range(cfg.algorithm.utd_ratio):
+            if nb_steps > cfg.algorithm.learning_starts:
+                # Get a sample from the workspace
+                rb_workspace = rb.get_shuffled(cfg.algorithm.batch_size)
 
-            terminated, reward = rb_workspace["env/terminated", "env/reward"]
-            if entropy_coef_optimizer is not None:
-                ent_coef = torch.exp(log_entropy_coef.detach())
+                terminated, reward = rb_workspace["env/terminated", "env/reward"]
+                if entropy_coef_optimizer is not None:
+                    ent_coef = torch.exp(log_entropy_coef.detach())
 
-            # Critic update part #
-            critic_optimizer.zero_grad()
+                # Critic update part #
+                critic_optimizer.zero_grad()
 
-            critic_losses = compute_critic_loss(
-                cfg,
-                reward,
-                ~terminated[1],
-                current_actor,
-                q_agents,
-                target_q_agents,
-                rb_workspace,
-                ent_coef,
-                M
-            )
+                critic_losses = compute_critic_loss(
+                    cfg,
+                    reward,
+                    ~terminated[1],
+                    current_actor,
+                    q_agents,
+                    target_q_agents,
+                    rb_workspace,
+                    ent_coef,
+                    M
+                )
 
-            for critic_loss in range(len(critic_losses)):
-                logger.add_log(f"critic_loss_{critic_loss}", critic_losses[critic_loss], nb_steps)
+                for critic_loss in range(len(critic_losses)):
+                    logger.add_log(f"critic_loss_{critic_loss}", critic_losses[critic_loss], nb_steps)
 
-            critic_loss = sum(critic_losses)
-            critic_loss.backward()
+                critic_loss = sum(critic_losses)
+                critic_loss.backward()
 
-            for critic in critics:
+                for critic in critics:
+                    torch.nn.utils.clip_grad_norm_(
+                        critic.parameters(), cfg.algorithm.max_grad_norm
+                    )
+
+                critic_optimizer.step()
+
+                # Actor update part #
+                actor_optimizer.zero_grad()
+                actor_loss = compute_actor_loss(
+                    ent_coef, current_actor, q_agents, rb_workspace, M
+                )
+                logger.add_log("actor_loss", actor_loss, nb_steps)
+                actor_loss.backward()
                 torch.nn.utils.clip_grad_norm_(
-                    critic.parameters(), cfg.algorithm.max_grad_norm
+                    actor.parameters(), cfg.algorithm.max_grad_norm
                 )
+                actor_optimizer.step()
 
-            critic_optimizer.step()
+                # Entropy coef update part #
+                if entropy_coef_optimizer is not None:
+                    # See Eq. (17) of the SAC and Applications paper
+                    # log. probs have been computed when computing the actor loss
+                    action_logprobs_rb = rb_workspace["policy/action_logprobs"].detach()
+                    entropy_coef_loss = -(
+                        log_entropy_coef.exp() * (action_logprobs_rb + target_entropy)
+                    ).mean()
+                    entropy_coef_optimizer.zero_grad()
+                    entropy_coef_loss.backward()
+                    entropy_coef_optimizer.step()
+                    logger.add_log("entropy_coef_loss", entropy_coef_loss, nb_steps)
+                logger.add_log("entropy_coef", ent_coef, nb_steps)
 
-            # Actor update part #
-            actor_optimizer.zero_grad()
-            actor_loss = compute_actor_loss(
-                ent_coef, current_actor, q_agents, rb_workspace, M
-            )
-            logger.add_log("actor_loss", actor_loss, nb_steps)
-            actor_loss.backward()
-            torch.nn.utils.clip_grad_norm_(
-                actor.parameters(), cfg.algorithm.max_grad_norm
-            )
-            actor_optimizer.step()
+                # Soft update of target q function
+                for critic, target_critic in zip(critics, target_critics):
+                    soft_update_params(critic, target_critic, tau)
+                # soft_update_params(actor, target_actor, tau)
 
-            # Entropy coef update part #
-            if entropy_coef_optimizer is not None:
-                # See Eq. (17) of the SAC and Applications paper
-                # log. probs have been computed when computing the actor loss
-                action_logprobs_rb = rb_workspace["policy/action_logprobs"].detach()
-                entropy_coef_loss = -(
-                    log_entropy_coef.exp() * (action_logprobs_rb + target_entropy)
-                ).mean()
-                entropy_coef_optimizer.zero_grad()
-                entropy_coef_loss.backward()
-                entropy_coef_optimizer.step()
-                logger.add_log("entropy_coef_loss", entropy_coef_loss, nb_steps)
-            logger.add_log("entropy_coef", ent_coef, nb_steps)
-
-            # Soft update of target q function
-            for critic, target_critic in zip(critics, target_critics):
-                soft_update_params(critic, target_critic, tau)
-            # soft_update_params(actor, target_actor, tau)
-
-        # Evaluate
-        if nb_steps - tmp_steps > cfg.algorithm.eval_interval:
-            tmp_steps = nb_steps
-            eval_workspace = Workspace()  # Used for evaluation
-            eval_agent(
-                eval_workspace,
-                t=0,
-                stop_variable="env/done",
-                stochastic=False,
-            )
-            rewards = eval_workspace["env/cumulated_reward"][-1]
-            mean = rewards.mean()
-            logger.log_reward_losses(rewards, nb_steps)
-
-            if mean > best_reward:
-                best_reward = mean
-
-            print(
-                f"nb steps: {nb_steps}, reward: {mean:.02f}, best: {best_reward:.02f}"
-            )
-            if cfg.save_best and best_reward == mean:
-                save_best(
-                    actor, cfg.gym_env.env_name, mean, "./redq_best_agents/", "redq"
+            # Evaluate
+            if nb_steps - tmp_steps > cfg.algorithm.eval_interval:
+                tmp_steps = nb_steps
+                eval_workspace = Workspace()  # Used for evaluation
+                eval_agent(
+                    eval_workspace,
+                    t=0,
+                    stop_variable="env/done",
+                    stochastic=False,
                 )
-            if cfg.collect_stats:
-                stats_data.append(rewards)
-    
+                rewards = eval_workspace["env/cumulated_reward"][-1]
+                mean = rewards.mean()
+                logger.log_reward_losses(rewards, nb_steps)
+
+                if mean > best_reward:
+                    best_reward = mean
+
+                print(
+                    f"nb steps: {nb_steps}, reward: {mean:.02f}, best: {best_reward:.02f}"
+                )
+                if cfg.save_best and best_reward == mean:
+                    save_best(
+                        actor, cfg.gym_env.env_name, mean, "./redq_best_agents/", "redq"
+                    )
+                if cfg.collect_stats:
+                    stats_data.append(rewards)
+
     if cfg.collect_stats:
+        directory = cfg.stats_directory
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        filename = directory + "redq-" + cfg.gym_env.env_name + ".data"
+        # Append the stats_data to the file as a numpy array without overwriting
+
         # All rewards, dimensions (# of evaluations x # of episodes)
         stats_data = torch.stack(stats_data, axis=-1)
-        print(np.shape(stats_data))
-        np.savetxt(filename, stats_data.numpy(), fmt='%.4f', delimiter=' ')
+
+        # Only create the file if it does not exist.
+        if not os.path.isfile(filename):
+            fo = open(filename, "wb")
+            fo.close()
+
+        old_stats_data = np.array([])
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            try:
+                old_stats_data = np.loadtxt(filename)
+            except:
+                pass
+        
+        if old_stats_data.shape != (0,):
+            # Get the number of episodes in the old data
+            old_n_episodes = old_stats_data.shape[1]
+            # Get the number of episodes in the new data
+            new_n_episodes = stats_data.shape[1]
+
+            # Remove the extra episodes from the new data if there are more episodes in the new data
+            if new_n_episodes > old_n_episodes:
+                stats_data = stats_data[:, :old_n_episodes]
+            # Remove the extra episodes from the old data if there are more episodes in the old data
+            elif new_n_episodes < old_n_episodes:
+                old_stats_data = old_stats_data[:, :new_n_episodes]
+                
+            # Concatenate the new rewards to the existing array
+            new_stats_data = np.concatenate((old_stats_data, stats_data), axis=0)
+            
+            fo = open(filename, "rb+")  # Open in read/write mode
+            np.savetxt(fo, new_stats_data, fmt='%.4f', delimiter=' ')
+        else:
+            fo = open(filename, "wb")
+            np.savetxt(fo, stats_data, fmt='%.4f', delimiter=' ')
+
         fo.flush()
         fo.close()
 
@@ -396,13 +434,12 @@ def load_best(best_filename):
 
 # %%
 @hydra.main(
-    config_path="./configs/",
-    # config_name="sac_cartpole.yaml",
-    config_name="redq_cartpolecontinuous.yaml",
-    # config_name="sac_pendulum.yaml",
-    # config_name="sac_swimmer_optuna.yaml",
-    # config_name="sac_swimmer.yaml",
-    # config_name="sac_torcs.yaml",
+    config_path="./configs/hopper/",
+    #config_path="./configs/walker/",
+    # config_name="redq_hopper_optuna.yaml",
+    config_name="redq_hopper.yaml",
+    # config_name="redq_walker_optuna.yaml",
+    # config_name="redq_walker.yaml",
     # version_base="1.3",
 )
 def main(cfg_raw: DictConfig):
