@@ -22,7 +22,7 @@ algorithm:
       nb_seeds: 1
       n_envs: 8
       n_steps_train: 32
-      n_steps: 5_000
+      n_steps: 4_000_000
       max_grad_norm: 0.5
       buffer_size: 10000000
       batch_size: 128

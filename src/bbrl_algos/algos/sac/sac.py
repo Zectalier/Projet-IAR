@@ -17,7 +17,6 @@ from bbrl.agents import Agents, TemporalAgent
 from bbrl_algos.models.loggers import Logger
 from bbrl.utils.replay_buffer import ReplayBuffer
 
-sys.path.append('/users/nfs/Etu7/21201287/Documents/bbrl_algos/src/')
 from bbrl_algos.models.stochastic_actors import (
     SquashedGaussianActor,
     TunableVarianceContinuousActor,
@@ -25,8 +24,7 @@ from bbrl_algos.models.stochastic_actors import (
 )
 from bbrl_algos.models.critics import ContinuousQAgent
 from bbrl_algos.models.shared_models import soft_update_params
-import sys
-
+from bbrl_algos.models.envs import get_env_agents
 from bbrl_algos.models.hyper_params import launch_optuna
 from bbrl_algos.models.utils import save_best
 
@@ -39,7 +37,7 @@ import warnings
 # HYDRA_FULL_ERROR = 1
 
 
-matplotlib.use("Agg")
+matplotlib.use("TkAgg")
 
 
 # Create the SAC Agent
@@ -213,14 +211,6 @@ def run_sac(cfg, logger, trial=None):
     # 2) Create the environment agent
     train_env_agent, eval_env_agent = get_env_agents(cfg)
 
-    if cfg.collect_stats:
-        directory = "./sac_data/"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        filename = directory + "sac_" + cfg.gym_env.env_name + ".data"
-        fo = open(filename, "wb")
-        stats_data = []
-
     # 3) Create the SAC Agent
     (
         train_agent,
@@ -365,49 +355,9 @@ def run_sac(cfg, logger, trial=None):
                 save_best(
                     actor, cfg.gym_env.env_name, mean, "./sac_best_agents/", "sac"
                 )
+
             if cfg.collect_stats:
                 stats_data.append(rewards)
-
-    if cfg.collect_stats:
-        directory = "./sac_data/"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        filename = directory + "sac-ant-v4.data"
-        # Append the stats_data to the file as a numpy array without overwriting
-
-        # All rewards, dimensions (# of evaluations x # of episodes)
-        stats_data = torch.stack(stats_data, axis=-1)
-        print(np.shape(stats_data))
-
-        # Load the numpy array from the file filename
-        old_stats_data = np.loadtxt(filename)
-        if old_stats_data.shape != (0,):
-            # Get the number of episodes in the old data
-            old_n_episodes = old_stats_data.shape[1]
-            # Get the number of episodes in the new data
-            new_n_episodes = stats_data.shape[1]
-
-            # Remove the extra episodes from the new data if there are more episodes in the new data
-            if new_n_episodes > old_n_episodes:
-                stats_data = stats_data[:, :old_n_episodes]
-            # Remove the extra episodes from the old data if there are more episodes in the old data
-            elif new_n_episodes < old_n_episodes:
-                old_stats_data = old_stats_data[:, :new_n_episodes]
-                
-            # Concatenate the new rewards to the existing array
-            new_stats_data = np.concatenate((old_stats_data, stats_data), axis=0)
-            
-            fo = open(filename, "rb+")  # Open in read/write mode
-            np.savetxt(fo, new_stats_data, fmt='%.4f', delimiter=' ')
-        else:
-            fo = open(filename, "wb")
-            np.savetxt(fo, stats_data, fmt='%.4f', delimiter=' ')
-
-        fo.flush()
-        fo.close()
-
-        if cfg.collect_stats:
-            stats_data.append(rewards)
 
     if cfg.collect_stats:
         directory = cfg.stats_directory
@@ -477,8 +427,8 @@ def load_best(best_filename):
     # version_base="1.3",
 )
 def main(cfg_raw: DictConfig):
-    torch.random.manual_seed(seed=cfg_raw.algorithm.seed.torch)
-
+    seed = torch.random.seed()
+    print(seed)
     if "optuna" in cfg_raw:
         launch_optuna(cfg_raw, run_sac)
     else:
@@ -488,5 +438,3 @@ def main(cfg_raw: DictConfig):
 
 if __name__ == "__main__":
     main()
-
-# %%
