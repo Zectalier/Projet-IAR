@@ -26,7 +26,7 @@ from bbrl_algos.models.stochastic_actors import (
 from bbrl_algos.models.critics import ContinuousQAgent
 from bbrl_algos.models.shared_models import soft_update_params
 import sys
-from bbrl_algos_local.models.envs import get_env_agents
+
 from bbrl_algos.models.hyper_params import launch_optuna
 from bbrl_algos.models.utils import save_best
 

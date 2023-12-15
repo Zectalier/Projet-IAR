@@ -29,7 +29,7 @@ algorithm:
       eval_interval: 2000
       nb_evals: 10
       learning_starts: 10000
-      tau_target: 0.005
+      tau_target: 0.07
       discount_factor: 0.99
       entropy_mode: "auto" # "auto" or "fixed"
       init_entropy_coef: 2e-7
@@ -45,12 +45,12 @@ gym_env:
 
 actor_optimizer:
       classname: torch.optim.Adam
-      lr: 0.01
+      lr: 0.0008
 
 critic_optimizer:
       classname: torch.optim.Adam
-      lr: 0.01
+      lr: 0.0008
 
 entropy_coef_optimizer:
       classname: torch.optim.Adam
-      lr: 0.01
+      lr: 0.0008
