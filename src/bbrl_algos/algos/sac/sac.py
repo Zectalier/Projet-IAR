@@ -365,24 +365,21 @@ def run_sac(cfg, logger, trial=None):
         directory = cfg.stats_directory
         if not os.path.exists(directory):
             os.makedirs(directory)
-        filename = directory + "sac-" + cfg.gym_env.env_name + ".data"
         # Count the number of files with sac-steps-*.data in the directory
-        run_number = len([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and "sac-steps-" in f])
-
-        filename_steps = directory + "sac-steps-" + str(run_number) + "-" + cfg.gym_env.env_name + ".data"
-        # Append the stats_data to the file as a numpy array without overwriting
-
+        run_number = len([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and "sac-" in f])
+        filename = directory + "sac-" + str(run_number) + "-" + cfg.gym_env.env_name + ".data"
+        
         # All rewards, dimensions (# of evaluations x # of episodes)
         stats_data = torch.stack(stats_data, axis=-1)
-
+        steps_data = np.hstack(steps_data)
+        print(type(steps_data))
+        print(steps_data.shape)
+        print(steps_data)
+        
         # Only create the file if it does not exist.
         if not os.path.isfile(filename):
             fo = open(filename, "wb")
             fo.close()
-
-        if not os.path.isfile(filename_steps):
-            fo_steps = open(filename_steps, "wb")
-            fo_steps.close()
 
         old_stats_data = np.array([])
         old_steps_data = np.array([])
@@ -391,7 +388,6 @@ def run_sac(cfg, logger, trial=None):
             warnings.filterwarnings("ignore", category=UserWarning)
             try:
                 old_stats_data = np.loadtxt(filename)
-                old_steps_data = np.loadtxt(filename_steps)
             except:
                 pass
         
@@ -410,17 +406,15 @@ def run_sac(cfg, logger, trial=None):
                 
             # Concatenate the new rewards to the existing array
             new_stats_data = np.concatenate((old_stats_data, stats_data), axis=0)
+            print(new_stats_data.shape)
             new_steps_data = np.concatenate((old_steps_data, steps_data), axis=0)
             
             fo = open(filename, "rb+")  # Open in read/write mode
-            fo_steps = open(filename_steps, "rb+")
             np.savetxt(fo, new_stats_data, fmt='%.4f', delimiter=' ')
-            np.savetxt(fo_steps, new_steps_data, fmt='%.4f', delimiter=' ')
         else:
             fo = open(filename, "wb")
-            fo_steps = open(filename_steps, "wb")
+            np.savetxt(fo, steps_data.reshape(1, steps_data.shape[0]), fmt='%.4f', delimiter=' ')
             np.savetxt(fo, stats_data, fmt='%.4f', delimiter=' ')
-            np.savetxt(fo_steps, steps_data, fmt='%.4f', delimiter=' ')
 
         fo.flush()
         fo.close()
