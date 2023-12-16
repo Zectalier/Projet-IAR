@@ -35,8 +35,8 @@ algorithm:
       init_entropy_coef: 2e-7
       actor_type: SquashedGaussianActor
       architecture:
-            actor_hidden_size: [32, 32]
-            critic_hidden_size: [128, 128]
+            actor_hidden_size: [256, 256]
+            critic_hidden_size: [512, 512]
       utd_ratio: 20
       M: 2
 
