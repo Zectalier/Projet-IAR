@@ -216,6 +216,7 @@ def compute_actor_loss(ent_coef, current_actor, q_agents, rb_workspace, M):
 def run_redq(cfg, logger, trial=None):
     best_reward = float("-inf")
     stats_data = []
+    steps_data = []
 
     # init_entropy_coef is the initial value of the entropy coef alpha.
     ent_coef = cfg.algorithm.init_entropy_coef
@@ -374,12 +375,17 @@ def run_redq(cfg, logger, trial=None):
                     )
                 if cfg.collect_stats:
                     stats_data.append(rewards)
+                    steps_data.append(nb_steps)
 
     if cfg.collect_stats:
         directory = cfg.stats_directory
         if not os.path.exists(directory):
             os.makedirs(directory)
         filename = directory + "redq-" + cfg.gym_env.env_name + ".data"
+        # Count the number of files with droQ-steps-*.data in the directory
+        run_number = len([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and "droQ-steps-" in f])
+
+        filename_steps = directory + "droQ-steps-" + str(run_number) + "-" + cfg.gym_env.env_name + ".data"
         # Append the stats_data to the file as a numpy array without overwriting
 
         # All rewards, dimensions (# of evaluations x # of episodes)
@@ -390,12 +396,18 @@ def run_redq(cfg, logger, trial=None):
             fo = open(filename, "wb")
             fo.close()
 
+        if not os.path.isfile(filename_steps):
+            fo_steps = open(filename_steps, "wb")
+            fo_steps.close()
+
         old_stats_data = np.array([])
+        old_steps_data = np.array([])
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
             try:
                 old_stats_data = np.loadtxt(filename)
+                old_steps_data = np.loadtxt(filename_steps)
             except:
                 pass
         
@@ -414,12 +426,17 @@ def run_redq(cfg, logger, trial=None):
                 
             # Concatenate the new rewards to the existing array
             new_stats_data = np.concatenate((old_stats_data, stats_data), axis=0)
+            new_steps_data = np.concatenate((old_steps_data, steps_data), axis=0)
             
             fo = open(filename, "rb+")  # Open in read/write mode
+            fo_steps = open(filename_steps, "rb+")
             np.savetxt(fo, new_stats_data, fmt='%.4f', delimiter=' ')
+            np.savetxt(fo_steps, new_steps_data, fmt='%.4f', delimiter=' ')
         else:
             fo = open(filename, "wb")
+            fo_steps = open(filename_steps, "wb")
             np.savetxt(fo, stats_data, fmt='%.4f', delimiter=' ')
+            np.savetxt(fo_steps, steps_data, fmt='%.4f', delimiter=' ')
 
         fo.flush()
         fo.close()
