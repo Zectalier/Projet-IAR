@@ -438,13 +438,14 @@ def load_best(best_filename):
     # version_base="1.3",
 )
 def main(cfg_raw: DictConfig):
-    seed = torch.random.seed()
-    print(seed)
     if "optuna" in cfg_raw:
         launch_optuna(cfg_raw, run_sac)
     else:
-        logger = Logger(cfg_raw)
-        run_sac(cfg_raw, logger)
+        for i in range(15):
+            seed = torch.random.seed()
+            print(seed)
+            logger = Logger(cfg_raw)
+            run_sac(cfg_raw, logger)
 
 
 if __name__ == "__main__":
