@@ -366,7 +366,10 @@ def run_sac(cfg, logger, trial=None):
         if not os.path.exists(directory):
             os.makedirs(directory)
         filename = directory + "sac-" + cfg.gym_env.env_name + ".data"
-        filename_steps = directory + "sac-steps-" + cfg.gym_env.env_name + ".data"
+        # Count the number of files with sac-steps-*.data in the directory
+        run_number = len([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and "sac-steps-" in f])
+
+        filename_steps = directory + "sac-steps-" + str(run_number) + "-" + cfg.gym_env.env_name + ".data"
         # Append the stats_data to the file as a numpy array without overwriting
 
         # All rewards, dimensions (# of evaluations x # of episodes)
