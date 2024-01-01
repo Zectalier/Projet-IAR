@@ -365,16 +365,13 @@ def run_sac(cfg, logger, trial=None):
         directory = cfg.stats_directory
         if not os.path.exists(directory):
             os.makedirs(directory)
-        # Count the number of files with sac-steps-*.data in the directory
+        # Count the number of files with sac-*.data in the directory
         run_number = len([f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and "sac-" in f])
         filename = directory + "sac-" + str(run_number) + "-" + cfg.gym_env.env_name + ".data"
         
         # All rewards, dimensions (# of evaluations x # of episodes)
         stats_data = torch.stack(stats_data, axis=-1)
         steps_data = np.hstack(steps_data)
-        print(type(steps_data))
-        print(steps_data.shape)
-        print(steps_data)
         
         # Only create the file if it does not exist.
         if not os.path.isfile(filename):
@@ -382,7 +379,6 @@ def run_sac(cfg, logger, trial=None):
             fo.close()
 
         old_stats_data = np.array([])
-        old_steps_data = np.array([])
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
@@ -406,8 +402,6 @@ def run_sac(cfg, logger, trial=None):
                 
             # Concatenate the new rewards to the existing array
             new_stats_data = np.concatenate((old_stats_data, stats_data), axis=0)
-            print(new_stats_data.shape)
-            new_steps_data = np.concatenate((old_steps_data, steps_data), axis=0)
             
             fo = open(filename, "rb+")  # Open in read/write mode
             np.savetxt(fo, new_stats_data, fmt='%.4f', delimiter=' ')
@@ -429,10 +423,10 @@ def load_best(best_filename):
 
 # %%
 @hydra.main(
-    config_path="./configs/hopper",
-    # config_path="./configs/walker",
-    config_name="sac_hopper.yaml",
-    # config_name="sac_walker.yaml",
+    # config_path="./configs/hopper",
+    config_path="./configs/walker",
+    # config_name="sac_hopper.yaml",
+    config_name="sac_walker.yaml",
     # config_name="sac_hopper_optuna.yaml",
     # config_name="sac_walker_optuna.yaml",
     # version_base="1.3",
