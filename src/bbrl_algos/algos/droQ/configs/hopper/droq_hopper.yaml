@@ -22,7 +22,7 @@ algorithm:
       nb_seeds: 1
       n_envs: 8
       n_steps_train: 32
-      n_steps: 5_000
+      n_steps: 4_000_000
       max_grad_norm: 0.5
       buffer_size: 10000000
       batch_size: 128
@@ -35,8 +35,8 @@ algorithm:
       init_entropy_coef: 2e-7
       actor_type: SquashedGaussianActor
       architecture:
-            actor_hidden_size: [32, 32]
-            critic_hidden_size: [128, 128]
+            actor_hidden_size: [256, 256]
+            critic_hidden_size: [512, 512]
       utd_ratio: 20
       M: 2
 
