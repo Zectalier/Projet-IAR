@@ -1,4 +1,4 @@
-save_best: False
+﻿save_best: False
 plot_agents: False
 collect_stats: True
 stats_directory: ../../../src/bbrl_algos/algos/algorithm_stats/
