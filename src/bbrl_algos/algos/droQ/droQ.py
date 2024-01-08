@@ -62,6 +62,7 @@ def create_droq_agent(cfg, train_env_agent, eval_env_agent, M):
             cfg.algorithm.architecture.critic_hidden_size,
             act_size,
             name=f"critic-{i+1}",
+            dropout=cfg.algorithm.dropout,
         )
         for i in range(M)
     ]
@@ -178,9 +179,9 @@ def compute_critic_loss(
 
     # Compute the critic loss for each critic
     for i in range(M):
-        td = target - q_values_rb[i].squeeze(-1)
+        td = q_values_rb[i].squeeze(-1) - target
         td_error = td**2
-        critic_losses.append(td_error.mean())
+        critic_losses.append(torch.mean(td_error))
     # [[/student]]
 
     return critic_losses
@@ -256,6 +257,8 @@ def run_droq(cfg, logger, trial=None):
     if cfg.algorithm.entropy_mode == "auto":
         # target_entropy is \mathcal{H}_0 in the SAC and aplications paper.
         target_entropy = -np.prod(train_env_agent.action_space.shape).astype(np.float32)
+    else:
+        target_entropy = cfg.algorithm.target_entropy
 
     # Training loop
     while nb_steps < cfg.algorithm.n_steps:
@@ -454,16 +457,18 @@ def load_best(best_filename):
 
 # %%
 @hydra.main(
-    config_path="./configs/hopper/",
+    config_path="./configs/walker/",
     # config_path="./configs/walker/",
-    config_name="droq_hopper.yaml",
+    config_name="droq_walker.yaml",
     # config_name="droq_walker.yaml",
     # config_name="droq_hopper_optuna.yaml",
     # config_name="droq_walker_optuna.yaml",
     # version_base="1.3",
 )
 def main(cfg_raw: DictConfig):
-    torch.random.manual_seed(seed=cfg_raw.algorithm.seed.torch)
+    tseed = np.random.randint(0, 1000000)
+    torch.random.manual_seed(seed=tseed)
+    print("Seed: ", tseed)
 
     if "optuna" in cfg_raw:
         launch_optuna(cfg_raw, run_droq)

@@ -1,0 +1,68 @@
+save_best: False
+plot_agents: False
+collect_stats: True
+
+log_dir: ./tmp
+video_dir: ${log_dir}/videos
+
+hydra:
+      run:
+            dir: ${log_dir}/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
+            
+logger:
+      classname: bbrl.utils.logger.WandbLogger
+      project: "droQ"
+      group: "droQ"
+      tags: "droQ_ant_v4"
+      job_type: test
+      log_dir: ${log_dir}
+      cache_size: 10000
+      every_n_seconds: 10
+      verbose: False
+algorithm:
+
+      seed:
+            train: 334
+            eval: 983
+            q: 123
+            explorer: 456
+            torch: 7
+
+
+      nb_seeds: 1
+      n_envs: 8
+      n_steps_train: 32
+      n_steps: 4_000_000
+      max_grad_norm: 0.5
+      buffer_size: 2e5
+      batch_size: 64
+      eval_interval: 2000
+      nb_evals: 10
+      learning_starts: 10000
+      tau_target: 0.05
+      discount_factor: 0.99
+      entropy_mode: "auto" # "auto" or "fixed"
+      init_entropy_coef: 2e-7
+      actor_type: SquashedGaussianActor
+      utd_ratio: 20
+      M: 2
+      architecture:
+            actor_hidden_size: [256, 256] 
+            critic_hidden_size: [512, 512]
+
+
+      # Note: Swimmer-v3 is deprecated, but Swimmer-v4 does not seem to accept an xml_file
+gym_env:
+      env_name: Ant-v4
+
+actor_optimizer:
+      classname: torch.optim.Adam
+      lr: 1e-4
+
+critic_optimizer:
+      classname: torch.optim.Adam
+      lr: 1e-3
+
+entropy_coef_optimizer:
+      classname: torch.optim.Adam
+      lr: 1e-3

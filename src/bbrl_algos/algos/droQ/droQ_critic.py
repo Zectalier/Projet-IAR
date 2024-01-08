@@ -26,7 +26,7 @@ class ContinuousQAgent(NamedCritic):
         hidden_layers,
         action_dim,
         name="critic",
-        dropout=0.01,
+        dropout=0.0001,
         *args,
         **kwargs,
     ):

@@ -1,0 +1,57 @@
+      log_dir: ./tmp
+      save_best: False
+      plot_agents: False
+      collect_stats: True
+      logger:
+            classname: bbrl.utils.logger.TFLogger
+            log_dir: ./droQ_logs/
+            verbose: False
+            every_n_seconds: 1000
+      hydra:
+            run:
+                  dir: ${log_dir}/hydra/study_DroQ
+
+      algorithm:
+
+            seed:
+                  train: 15
+                  eval: 15
+                  q: 15
+                  explorer: 15
+                  torch: 15
+
+            nb_seeds: 1
+            n_envs: 8
+            n_steps_train: 32
+            n_steps: 1_200_000
+            max_grad_norm: 0.5
+            buffer_size: 2e5
+            batch_size: 64
+            eval_interval: 2000
+            nb_evals: 10
+            learning_starts: 10000
+            tau_target: 0.05
+            discount_factor: 0.99
+            entropy_mode: "auto" # "auto" or "fixed"
+            init_entropy_coef: 2e-7
+            actor_type: SquashedGaussianActor
+            architecture:
+                  actor_hidden_size: [256, 256]
+                  critic_hidden_size: [256, 256]
+            utd_ratio: 20
+            M: 2
+
+      gym_env:
+            env_name: CartPoleContinuous-v1
+
+      actor_optimizer:
+            classname: torch.optim.Adam
+            lr: 1e-4
+
+      critic_optimizer:
+            classname: torch.optim.Adam
+            lr: 1e-3
+
+      entropy_coef_optimizer:
+            classname: torch.optim.Adam
+            lr: 1e-3

@@ -1,0 +1,93 @@
+save_best: False
+plot_agents: False
+collect_stats: True
+
+log_dir: ./tmp
+video_dir: ${log_dir}/videos
+
+hydra:
+      run:
+            dir: ${log_dir}/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+optuna:
+      study:
+        _target_: optuna.create_study
+        study_name: sac_swimmer
+        direction: maximize
+        # for a list of optuna pruners, this is here: https://optuna.readthedocs.io/en/stable/reference/pruners.html
+        pruner:
+          _target_: optuna.pruners.MedianPruner
+          n_startup_trials: 5
+          n_warmup_steps: 5
+          interval_steps: 1
+      optimize:
+        n_trials: 10000
+        timeout: 3600
+        n_jobs: 1
+
+logger:
+      classname: bbrl.utils.logger.WandbLogger
+      project: "sac_study"
+      group: "tune_sac"
+      tags: "hp_sac"
+      job_type: test
+      log_dir: ${log_dir}
+      cache_size: 10000
+      every_n_seconds: 10
+      verbose: False
+
+algorithm:
+
+      seed:
+            train: 335
+            eval: 983
+            q: 123
+            explorer: 456
+            torch: 7
+
+      n_envs: 8
+      n_steps_train: 32
+      n_steps: 300_000
+      eval_interval: 5000
+      nb_evals: 10
+      buffer_size: 1e6
+      batch_size: 256
+      learning_starts: 10000
+      tau_target: 0.05
+      max_grad_norm: 0.5
+      discount_factor: 1.0
+      entropy_mode: "auto" # "auto" or "fixed"
+      init_entropy_coef: 2e-7
+      actor_type: SquashedGaussianActor
+      architecture:
+            actor_hidden_size:
+                  suggest_type: categorical
+                  choices:
+                        - [64, 64]
+                        - [128, 128]
+                        - [256, 256]
+                        - [400, 300]
+            critic_hidden_size:
+                  suggest_type: categorical
+                  choices:
+                        - [64, 64]
+                        - [128, 128]
+                        - [256, 256]
+                        - [400, 300]
+
+      # Note: Swimmer-v3 is deprecated, but Swimmer-v4 does not seem to accept an xml_file
+gym_env:
+      env_name: SwimmerBBRLEnv-v0
+      xml_file: swimmer5.xml
+
+actor_optimizer:
+      classname: torch.optim.Adam
+      lr: 1e-3
+
+critic_optimizer:
+      classname: torch.optim.Adam
+      lr: 1e-3
+
+entropy_coef_optimizer:
+      classname: torch.optim.Adam
+      lr: 1e-3
