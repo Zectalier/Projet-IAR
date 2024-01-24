@@ -1,6 +1,10 @@
-wandb
-optuna
-bbrl >= 0.2.2
-bbrl_gymnasium[mujoco]
-bbrl_gymnasium[box2d]
-bbrl_gymnasium[classic_control]
+cloudpickle==3.0.0
+gym==0.26.2
+gymnasium==0.29.1
+matplotlib==3.8.2
+numpy==1.26.3
+pandas==2.1.4
+psutil==5.9.7
+shimmy==1.3.0
+torch==2.1.2
+tqdm==4.66.1
