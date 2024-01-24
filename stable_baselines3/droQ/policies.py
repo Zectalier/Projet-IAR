@@ -248,6 +248,7 @@ class DroQPolicy(BasePolicy):
             normalize_images=normalize_images,
         )
         self.dropout_rate = dropout_rate
+        self.n_critics = 10
 
         if net_arch is None:
             net_arch = [256, 256]
