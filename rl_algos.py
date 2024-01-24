@@ -1,7 +1,7 @@
 import gymnasium as gym
 
 import sys
-sys.path.append('/users/nfs/Etu7/21201287/Documents/Projet-IAR/')
+sys.path.append('.')
 
 from stable_baselines3.droQ.droQ import DroQ
 from stable_baselines3.droQ.redq import REDQ
